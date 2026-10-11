@@ -23,16 +23,17 @@
     { id: "select", label: "View / Select / Share" },
     { id: "start", label: "Menu / Start / Options" },
     { id: "l3", label: "Left stick click (L3)" },
+    { id: "r3", label: "Right stick click (R3)" },
   ];
 
   const btn = (index) => ({ type: "button", index });
 
-  // W3C "standard" mapping – what Firefox reports for XInput pads
+  // W3C "standard" mapping - what Firefox reports for XInput pads
   // (Xbox, 8BitDo in X-input mode, most PC pads) and DualShock/DualSense.
   const STANDARD_BINDINGS = {
     confirm: [btn(0)], back: [btn(1)], x: [btn(2)], y: [btn(3)],
     lb: [btn(4)], rb: [btn(5)], lt: [btn(6)], rt: [btn(7)],
-    select: [btn(8)], start: [btn(9)], l3: [btn(10)],
+    select: [btn(8)], start: [btn(9)], l3: [btn(10)], r3: [btn(11)],
     up: [btn(12)], down: [btn(13)], left: [btn(14)], right: [btn(15)],
   };
 
@@ -41,7 +42,7 @@
   const GENERIC_BINDINGS = {
     confirm: [btn(1)], back: [btn(2)], x: [btn(0)], y: [btn(3)],
     lb: [btn(4)], rb: [btn(5)], lt: [btn(6)], rt: [btn(7)],
-    select: [btn(8)], start: [btn(9)], l3: [btn(10)],
+    select: [btn(8)], start: [btn(9)], l3: [btn(10)], r3: [btn(11)],
     up: [btn(12), { type: "axisValue", index: 9, value: -1 }],
     down: [btn(13), { type: "axisValue", index: 9, value: 0.14 }],
     left: [btn(14), { type: "axisValue", index: 9, value: 0.71 }],
@@ -107,8 +108,8 @@
 
   /**
    * Polls all connected pads every animation frame and emits:
-   *   onAction(actionId, { repeat })  – on press, and on repeat for directions
-   *   onStick({ lx, ly, rx, ry })      – analog values past the deadzone, every frame
+   *   onAction(actionId, { repeat })  - on press, and on repeat for directions
+   *   onStick({ lx, ly, rx, ry })      - analog values past the deadzone, every frame
    */
   class GamepadInput {
     constructor(settings, handlers) {

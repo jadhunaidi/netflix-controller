@@ -1,10 +1,10 @@
-# Netflix Controller – To Do
+# Netflix Controller - To Do
 
 ## Status
 
 - **Version:** 1.2.0 (adds controls bar with button icons). 1.1.0 (TV mode) is waiting for Mozilla approval
 - **Tested on:** a mock Netflix page with a simulated controller (menus, row paging, details, My List, search keyboard, player controls, TV mode, controls bar, help screen icons)
-- **Tested on real netflix.com (2026-10-12, new "Hawkins" UI):** home rows, row paging, title details open/close, search keyboard, focus memory, back navigation. Player **not** testable in the test browser (DRM error M7701-1003) – needs checking in Firefox
+- **Tested on real netflix.com (2026-10-12, new "Hawkins" UI):** home rows, row paging, title details open/close, search keyboard, focus memory, back navigation. Player **not** testable in the test browser (DRM error M7701-1003) - needs checking in Firefox
 
 ---
 
@@ -17,15 +17,17 @@
 - [ ] Remove the temporary copy from `about:debugging` once the signed version is installed
 
 ### Real-world testing on netflix.com
-- [ ] Profile picker: highlight lands on a profile and A selects it (not reached in testing – session already had a profile)
+- [ ] Profile picker: highlight lands on a profile and A selects it (not reached in testing - session already had a profile)
 - [x] Home page: rows, moving up/down, LB/RB row scrolling, arrows at the end of rows
 - [x] Title details: opening with A, closing with B, focus returns to the card
 - [ ] Y = My List in title details (button found: `add-to-my-list` / `add-to-my-list-added`; not pressed in testing)
 - [x] Search: X opens the search box, on-screen keyboard typing updates results
 - [ ] Player: play/pause, seek, volume, mute through Netflix's player API (no playback errors)
 - [ ] Player: Y skips intro/recap, B exits
-- [ ] Player controls mode: Up shows Netflix's bar, D-pad moves across buttons, A opens speed / subtitles / episodes menus and the D-pad works inside them, B closes a menu or returns to the video, bar stays visible while in controls mode, volume slider appears when the volume button is highlighted
-- [ ] Title details in Firefox: dialog is detected (lifted card and info panel disappear, Play is highlighted) – was broken before v1.2.0 fix
+- [ ] Player menus: LT opens audio & subtitles, R3 playback speed, L3 episodes; D-pad moves inside the menu, A picks (menu closes), B closes; menu stays open while choosing
+- [x] Title details: Resume/Play highlighted on open (~0.3s), Left/Right along the button row, Down into episodes, season picker (A opens, D-pad, A picks, B closes menu only), A on an episode starts playback, B closes back to the same card - verified live 2026-10-12
+- [ ] Title details on a movie (no episodes): Down should reach "More like this" cards and the trailer/about sections sensibly
+- [ ] Long episode lists: "section-expand" (show more) button reachable and works
 - [ ] Fullscreen with View/Select. If Firefox blocks it, decide whether to keep the F11 message
 - [ ] Hover previews: check that the mouse resting on a card doesn't confuse the highlight
 
@@ -106,6 +108,7 @@
 - [x] On-screen keyboard for search
 - [x] Settings page with live controller test and button-remap wizard
 - [x] TV mode: lifted focus card, row dimming, title info panel, fixed focus row, no hover pop-ups, larger UI; L3 toggle and settings checkbox
+- [x] Title dialog fixes: use the outermost dialog (a nested details section used to swallow the Play button), skip cast/genre/rating text links, horizontal moves stay on one line, B closes an open season menu first, Loading state after pressing A on an episode
 - [x] Ported to Netflix's new UI (carousel-row-section / standard-card / hawkins arrows / nav search input) and verified on the live site
 - [x] Back navigation rework: waits for the modal/page to actually change instead of fixed delays, per-page focus memory (kept across reloads) so B returns to the exact card, double-press guard, row paging waits for the slide to settle
 - [x] Controls bar: console-style button prompts that follow context, auto-detected Xbox / PlayStation / Nintendo / generic icons, press animation, auto-hide in player

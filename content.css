@@ -14,7 +14,6 @@ html.nfc-tv #nfc-root { --s: 1.3; }
   position: fixed; left: 0; top: 0;
   border: 3px solid #fff; border-radius: 8px;
   box-shadow: 0 0 0 3px rgba(229, 9, 20, .9), 0 0 24px 6px rgba(229, 9, 20, .55);
-  transition: transform 110ms ease-out, width 110ms ease-out, height 110ms ease-out;
   will-change: transform;
 }
 html.nfc-tv .nfc-ring {
@@ -34,7 +33,7 @@ html.nfc-tv .nfc-ring {
 }
 .nfc-toast.nfc-show { opacity: 1; transform: translate(-50%, 0); }
 
-/* Controls bar – console-style button prompts along the bottom of the screen */
+/* Controls bar - console-style button prompts along the bottom of the screen */
 .nfc-bar {
   position: fixed; left: 0; right: 0; bottom: 0;
   display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;
@@ -45,6 +44,20 @@ html.nfc-tv .nfc-ring {
   transition: opacity 260ms ease, transform 260ms ease;
 }
 .nfc-bar.nfc-hide, html:not(.nfc-active) .nfc-bar { opacity: 0; transform: translateY(14px); }
+
+/* While watching: a small chip in the top-right corner, away from Netflix's own bar */
+html.nfc-player .nfc-bar {
+  left: auto; right: 20px; bottom: auto; top: 18px;
+  justify-content: flex-end; flex-wrap: nowrap;
+  gap: calc(6px * var(--s)) calc(16px * var(--s));
+  padding: calc(7px * var(--s)) calc(12px * var(--s));
+  background: rgba(0, 0, 0, .58); border: 1px solid rgba(255, 255, 255, .08); border-radius: 10px;
+  backdrop-filter: blur(6px); font-size: calc(12.5px * var(--s));
+}
+html.nfc-player .nfc-bar .nfc-glyph { width: calc(18px * var(--s)); height: calc(18px * var(--s)); }
+html.nfc-player .nfc-bar .nfc-glyph.nfc-wide { width: calc(24.75px * var(--s)); }
+html.nfc-player .nfc-bar-item { gap: calc(6px * var(--s)); }
+html.nfc-player .nfc-bar.nfc-hide { opacity: 0; transform: translateY(-8px); }
 .nfc-bar-item { display: flex; align-items: center; gap: calc(8px * var(--s)); }
 .nfc-bar-label {
   color: #e8e8e8; font-weight: 500; letter-spacing: .2px; white-space: nowrap;
@@ -107,7 +120,7 @@ html.nfc-tv .nfc-ring {
 
 /* ------------------------------------------------------------ TV mode -- */
 
-/* Only while the controller is in use – moving the mouse restores the normal site. */
+/* Only while the controller is in use - moving the mouse restores the normal site. */
 html:not(.nfc-active) .nfc-lift,
 html:not(.nfc-active) .nfc-info { display: none !important; }
 
@@ -115,7 +128,6 @@ html:not(.nfc-active) .nfc-info { display: none !important; }
 .nfc-lift {
   position: fixed; left: 0; top: 0; border-radius: 8px; overflow: hidden;
   box-shadow: 0 16px 44px rgba(0, 0, 0, .8);
-  transition: transform 110ms ease-out, width 110ms ease-out, height 110ms ease-out;
   will-change: transform;
 }
 .nfc-lift img { display: block; width: 100%; height: 100%; object-fit: cover; }

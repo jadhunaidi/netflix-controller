@@ -1,5 +1,5 @@
 /*
- * Netflix Controller Navigator – content script.
+ * Netflix Controller Navigator - content script.
  *
  * Menus:  spatial navigation over everything clickable on the page, with a
  *         highlight ring, carousel paging and an on-screen keyboard for search.
@@ -114,16 +114,11 @@
       return [["dpad", "Move"], ["confirm", "Type"], ["back", osk.text ? "Delete" : "Close"], ["x", "Space"], ["start", "Done"]];
     }
     if (isPlayer()) {
-      if (ctrlMode) {
-        const label = focused && focused.isConnected && (focused.getAttribute("aria-label") || focused.textContent.trim());
-        const items = [["dpad", "Move"], ["confirm", label ? label.slice(0, 22) : "Select"]];
-        items.push(["back", playerPopup() ? "Close menu" : "Back to video"]);
-        return items;
-      }
-      const items = [["confirm", playerPaused() ? "Play" : "Pause"], ["dpad-h", "Seek"], ["dpad-v", "Controls / Vol−"]];
+      if (playerPopup()) return [["dpad", "Choose"], ["confirm", "Select"], ["back", "Close"]];
+      const items = [["confirm", playerPaused() ? "Play" : "Pause"], ["dpad", "Seek / Volume"]];
       const skip = findSkipButton();
       if (skip) items.push(["y", (skip.textContent.trim() || "Skip").slice(0, 24)]);
-      items.push(["back", "Exit"]);
+      items.push(["lt", "Subtitles"], ["r3", "Speed"], ["l3", "Episodes"], ["rt", "Next"], ["back", "Exit"]);
       return items;
     }
     const modal = getModal();
@@ -145,7 +140,7 @@
     return items;
   }
 
-  let barSig = "", barTimer = 0;
+  let barSig = "";
   function refreshBar(poke) {
     if (!settings.showHints || !controllerActive) {
       barEl.hidden = true;
@@ -161,15 +156,12 @@
       ).join("");
     }
     barEl.hidden = false;
-    // While watching, the bar fades out like a native player overlay unless paused.
-    if (isPlayer() && !osk.open && helpEl.hidden) {
-      if (poke) {
-        barEl.classList.remove("nfc-hide");
-        clearTimeout(barTimer);
-        barTimer = setTimeout(() => { if (!playerPaused()) barEl.classList.add("nfc-hide"); }, 3500);
-      } else if (playerPaused()) {
-        barEl.classList.remove("nfc-hide");
-      }
+    const inPlayer = isPlayer();
+    document.documentElement.classList.toggle("nfc-player", inPlayer);
+    // While watching the hints are a small corner chip, shown only while
+    // paused or while a menu is open - never on a timer, never over Netflix's bar.
+    if (inPlayer && !osk.open && helpEl.hidden) {
+      barEl.classList.toggle("nfc-hide", !(playerPaused() || playerPopup()));
     } else {
       barEl.classList.remove("nfc-hide");
     }
@@ -200,9 +192,9 @@
   }, { passive: true });
 
   window.addEventListener("gamepadconnected", (e) => {
-    toast(`🎮 Controller connected – press Start for help`, 2500);
+    toast(`Controller connected - press Start for help`, 2500);
   });
-  window.addEventListener("gamepaddisconnected", () => toast("🎮 Controller disconnected", 2000));
+  window.addEventListener("gamepaddisconnected", () => toast("Controller disconnected", 2000));
 
   // --------------------------------------------------------- context ----
 
@@ -218,11 +210,19 @@
     const list = document.querySelectorAll(
       '[aria-modal="true"], [role="dialog"], [data-uia^="modal-motion-container"], .previewModal--container.detail-modal, .detail-modal'
     );
-    for (let i = list.length - 1; i >= 0; i--) {
-      const d = list[i];
+    // Netflix nests dialog-like sections inside the title dialog; take the
+    // outermost one, never a sub-section (that hid the Play button).
+    const inDetails = /[?&]jbv=/.test(location.search);
+    let best = null;
+    for (const d of list) {
       if (d.closest("#nfc-root") || d === closingModal) continue;
-      if (bigEnough(d)) return d;
+      // While the title dialog animates in it is still small; trust its
+      // container whenever the URL says a title is open.
+      const ok = bigEnough(d) || (inDetails && /^modal-motion-container/.test(d.getAttribute("data-uia") || ""));
+      if (!ok) continue;
+      if (!best || d.contains(best)) best = d;
     }
+    if (best) return best;
     // Title details are open whenever ?jbv= is in the URL; if none of the
     // markers above matched, walk up from the close button to the dialog box.
     if (/[?&]jbv=/.test(location.search)) {
@@ -274,9 +274,14 @@
   const isHandle = (el) => /\bhandle(Next|Prev)\b/.test(el.className || "") ||
     /^carousel-hawkins-(left|right)-button$/.test(el.getAttribute("data-uia") || "");
 
+  // Inline text links in title details (cast, genres, "more", the rating)
+  // are clutter for a D-pad; skip them so Down goes to the episodes.
+  const CLUTTER_SEL = '[data-uia^="previewModal--tags"] a, [data-uia="tag-more"], [data-uia="maturity-rating"] a, a[href^="#"]';
+
   function isUsable(el) {
     if (el.closest("#nfc-root")) return false;
     if (el.disabled || el.closest('[aria-hidden="true"], [inert]')) return false;
+    if (el.matches(CLUTTER_SEL)) return false;
     const r = el.getBoundingClientRect();
     if (r.width < 8 || r.height < 8) return false;
     if (r.width * r.height > innerWidth * innerHeight * 0.85) return false;
@@ -286,7 +291,7 @@
     if (visW < r.width * 0.5) return false;
     if (el.checkVisibility) {
       const opts = { visibilityProperty: true, checkVisibilityCSS: true };
-      // Netflix carousel arrows are transparent until hovered – keep them.
+      // Netflix carousel arrows are transparent until hovered - keep them.
       if (!isHandle(el)) Object.assign(opts, { opacityProperty: true, checkOpacity: true });
       if (!el.checkVisibility(opts)) return false;
     }
@@ -432,6 +437,9 @@
         primary = dir === "right" ? r.left - from.right : from.left - r.right;
         if (primary < -Math.min(from.width, r.width) * 0.5) continue;
         const gap = Math.max(0, Math.max(r.top, from.top) - Math.min(r.bottom, from.bottom));
+        // A sideways move stays on roughly the same line; don't leap to a
+        // button far above or below just because it is the only thing that way.
+        if (gap > Math.max(120, from.height * 2)) continue;
         ortho = gap + Math.abs(cy - fcy) * 0.15;
         weight = 5; // stay in the same row
       } else {
@@ -553,14 +561,6 @@
     return true;
   }
 
-  async function toggleTvMode() {
-    settings.tvMode = !settings.tvMode;
-    applyTvMode();
-    if (focused && focused.isConnected) setFocus(focused, { scroll: settings.tvMode });
-    toast(settings.tvMode ? "📺 TV mode on" : "TV mode off");
-    try { await NFC.saveSettings(settings); } catch (e) { /* storage unavailable */ }
-  }
-
   applyTvMode();
 
   function currentRect() {
@@ -647,7 +647,7 @@
 
   // Ring follows the focused element every frame (cards animate/resize).
   function updateRing() {
-    const r = (!isPlayer() || ctrlMode) && controllerActive && focused && focused.isConnected
+    const r = (!isPlayer() || playerPopup()) && controllerActive && focused && focused.isConnected
       ? focused.getBoundingClientRect() : null;
     if (r && r.width > 0) {
       let box = r;
@@ -699,6 +699,14 @@
   async function closeModal() {
     const modal = getModal();
     if (!modal) return false;
+    // An open drop-down (season picker) inside the dialog closes first.
+    const dropdown = modal.querySelector('[data-uia="dropdown-toggle"][aria-expanded="true"], [aria-haspopup="true"][aria-expanded="true"]');
+    if (dropdown) {
+      dropdown.click();
+      await sleep(200);
+      if (dropdown.isConnected && isUsable(dropdown)) setFocus(dropdown, { scroll: false });
+      return true;
+    }
     // Netflix ignores the close button while the dialog is still animating in.
     const sinceOpen = performance.now() - modalOpenedAt;
     if (sinceOpen < 900) await sleep(900 - sinceOpen);
@@ -785,7 +793,7 @@
     );
     if (btn) {
       btn.click();
-      toast("✓ My List updated");
+      toast("My List updated");
       return true;
     }
     return false;
@@ -815,13 +823,13 @@
     const p = nfPlayer();
     try {
       if (p) {
-        if (p.getPaused()) { p.play(); toast("▶ Play", 800); } else { p.pause(); toast("❚❚ Pause", 800); }
+        if (p.getPaused()) { p.play(); toast("Play", 800); } else { p.pause(); toast("Pause", 800); }
         return;
       }
     } catch (e) { /* fall through */ }
     const v = video();
     if (v) {
-      if (v.paused) { v.play(); toast("▶ Play", 800); } else { v.pause(); toast("❚❚ Pause", 800); }
+      if (v.paused) { v.play(); toast("Play", 800); } else { v.pause(); toast("Pause", 800); }
     } else {
       pressKey(" ", "Space", 32);
     }
@@ -834,13 +842,13 @@
         const dur = p.getDuration();
         const t = Math.min(Math.max(0, p.getCurrentTime() + seconds * 1000), dur - 1000);
         p.seek(t);
-        toast(`${seconds > 0 ? "⏩ +" : "⏪ "}${seconds}s   ${fmt(t / 1000)} / ${fmt(dur / 1000)}`, 1000);
+        toast(`${seconds > 0 ? "+" : ""}${seconds}s  ${fmt(t / 1000)} / ${fmt(dur / 1000)}`, 1000);
         return;
       }
     } catch (e) { /* fall through */ }
     // Netflix's own shortcut (setting video.currentTime directly breaks DRM playback).
     pressKey(seconds > 0 ? "ArrowRight" : "ArrowLeft", seconds > 0 ? "ArrowRight" : "ArrowLeft", seconds > 0 ? 39 : 37);
-    toast(seconds > 0 ? "⏩ Forward" : "⏪ Back", 800);
+    toast(seconds > 0 ? "Forward" : "Back", 800);
   }
 
   function changeVolume(delta) {
@@ -850,14 +858,14 @@
         const v = Math.min(1, Math.max(0, p.getVolume() + delta));
         p.setVolume(v);
         if (v > 0 && (p.isMuted ? p.isMuted() : false)) p.setMuted(false);
-        toast(`🔊 ${Math.round(v * 100)}%`, 800);
+        toast(`Volume ${Math.round(v * 100)}%`, 800);
         return;
       }
     } catch (e) { /* fall through */ }
     const vid = video();
     if (vid) {
       vid.volume = Math.min(1, Math.max(0, vid.volume + delta));
-      toast(`🔊 ${Math.round(vid.volume * 100)}%`, 800);
+      toast(`Volume ${Math.round(vid.volume * 100)}%`, 800);
     } else {
       pressKey(delta > 0 ? "ArrowUp" : "ArrowDown", delta > 0 ? "ArrowUp" : "ArrowDown", delta > 0 ? 38 : 40);
     }
@@ -869,28 +877,55 @@
       if (p) {
         const muted = p.isMuted ? p.isMuted() : p.getMuted();
         p.setMuted(!muted);
-        toast(muted ? "🔊 Unmuted" : "🔇 Muted", 800);
+        toast(muted ? "Unmuted" : "Muted", 800);
         return;
       }
     } catch (e) { /* fall through */ }
     const v = video();
-    if (v) { v.muted = !v.muted; toast(v.muted ? "🔇 Muted" : "🔊 Unmuted", 800); }
+    if (v) { v.muted = !v.muted; toast(v.muted ? "Muted" : "Unmuted", 800); }
     else pressKey("m", "KeyM", 77);
   }
 
+  // Netflix shows its control bar on mouse activity; fake a little of it on
+  // the player, the video and the page so whichever listener it uses fires.
+  let revealTick = 0;
   function revealControls() {
-    const target = document.querySelector(".watch-video, .watch-video--player-view") || document.body;
-    const r = target.getBoundingClientRect();
-    target.dispatchEvent(new MouseEvent("mousemove", {
-      bubbles: true, clientX: r.left + r.width / 2 + Math.random() * 10, clientY: r.top + r.height / 2,
-    }));
+    revealTick++;
+    const targets = [
+      document.querySelector("video"),
+      document.querySelector('.watch-video, .watch-video--player-view, [data-uia="watch-video"], [data-uia*="player"]'),
+      document.body,
+    ].filter(Boolean);
+    const x = innerWidth / 2 + (revealTick % 2 ? 18 : -18), y = innerHeight / 2 + (revealTick % 3) * 9;
+    for (const t of targets) {
+      t.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x, clientY: y, pointerType: "mouse", isPrimary: true }));
+      t.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: x, clientY: y, movementX: 12, movementY: 4 }));
+    }
   }
 
-  // ----------------------------------------------- player controls mode ----
-  // Up while watching brings up Netflix's own control bar; the D-pad then
-  // moves across its buttons and into the speed / subtitles / episodes menus.
+  // Bring the bar up and wait until one of `selectors` is actually mounted
+  // and usable (the new player adds its buttons a moment after the bar shows).
+  async function withControls(selectors, timeout = 1800) {
+    const find = () => selectors.map((sel) => document.querySelector(sel)).find((b) => b && isUsable(b)) || null;
+    const t0 = performance.now();
+    let btn = find();
+    while (!btn && performance.now() - t0 < timeout) {
+      revealControls();
+      await sleep(120);
+      btn = find();
+    }
+    if (!btn) {
+      console.info("[NetflixController] control not found for", selectors.join(" | "),
+        "- data-uia on page:", Array.from(document.querySelectorAll("[data-uia]")).map((e) => e.getAttribute("data-uia")).join(", "));
+    }
+    return btn;
+  }
 
-  let ctrlMode = false, ctrlKeepAlive = 0;
+  // ------------------------------------------------- player pop-up menus ----
+  // LT / R3 / L3 open Netflix's audio & subtitles, speed and episodes menus
+  // directly. While one is open the D-pad moves inside it, A picks, B closes.
+
+  let menuKeepAlive = 0;
 
   // A pop-up menu opened from the control bar (speed, audio & subtitles, episodes).
   function playerPopup() {
@@ -914,26 +949,98 @@
     }
   }
 
-  function enterCtrlMode() {
-    ctrlMode = true;
-    revealControls();
-    clearInterval(ctrlKeepAlive);
-    // Netflix hides the bar after a few idle seconds; keep nudging it.
-    ctrlKeepAlive = setInterval(() => { revealControls(); hoverFocused(); }, 1500);
-    waitFor(() => { const c = getCandidates(); return c.length ? c : null; }, { timeout: 1500 }).then((cands) => {
-      if (!ctrlMode || !cands) return;
-      setFocus(pickInitial(cands), { scroll: false });
-      hoverFocused();
-      refreshBar(true);
-    });
-    toast("Controls – D-pad to move, A to select, B to go back", 1800);
+  const MENU_BUTTONS = {
+    subtitles: ['[data-uia="control-audio-subtitle"]', '[data-uia*="audio-subtitle"]', '[data-uia*="subtitle"]', '[aria-label*="subtitle" i]', '[aria-label*="audio" i]'],
+    speed: ['[data-uia="control-speed"]', '[data-uia*="speed"]', '[aria-label*="speed" i]'],
+    episodes: ['[data-uia="control-episodes"]', '[data-uia*="episodes"]', '[aria-label*="episode" i]:not([aria-label*="next" i])'],
+  };
+  const MENU_NAMES = { subtitles: "Audio & subtitles", speed: "Playback speed", episodes: "Episodes" };
+
+  // Menu items often use a roving tabindex (only the active option is
+  // tabindex="0") and roles the page-wide search ignores, so look wider here.
+  const MENU_ITEM_SEL = FOCUSABLE + ', [role="radio"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"], li[tabindex], [tabindex="-1"][role], [data-uia*="option"]';
+  const MENU_CONTAINER_SEL = '[role="menu"], [role="listbox"], [role="radiogroup"], [role="group"], [role="dialog"], ul, ol';
+
+  function menuCandidates(popup) {
+    const all = Array.from(popup.querySelectorAll(MENU_ITEM_SEL))
+      .filter((el) => !el.matches(MENU_CONTAINER_SEL) && isUsable(el));
+    const set = new Set(all), drop = new Set();
+    const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+    for (const el of all) {
+      let p = el.parentElement;
+      for (let d = 0; p && d < 25; d++, p = p.parentElement) {
+        if (!set.has(p)) continue;
+        if (area(el) >= area(p) * 0.8) drop.add(el); else drop.add(p);
+        break;
+      }
+    }
+    return all.filter((el) => !drop.has(el));
   }
 
-  function exitCtrlMode() {
-    ctrlMode = false;
-    clearInterval(ctrlKeepAlive);
-    focused = null;
+  async function openPlayerMenu(kind) {
+    const open = playerPopup();
+    if (open) { closePlayerMenu(); await sleep(250); }
+    const btn = await withControls(MENU_BUTTONS[kind]);
+    if (!btn) { toast(`${MENU_NAMES[kind]} button not found`); return; }
+    btn.click();
+    const popup = await waitFor(playerPopup, { timeout: 1500 });
+    if (!popup) { toast(`${MENU_NAMES[kind]} menu didn't open`); return; }
+    const cands = await waitFor(() => { const c = menuCandidates(popup); return c.length ? c : null; }, { timeout: 1000 });
+    if (cands) {
+      // Start on the current choice (ticked / selected item) when there is one.
+      const current = cands.find((c) => c.matches('[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], .selected'));
+      setFocus(current || cands[0], { scroll: false });
+      hoverFocused();
+    }
+    clearInterval(menuKeepAlive);
+    // Netflix hides the bar (and the menu with it) after a few idle seconds.
+    menuKeepAlive = setInterval(() => {
+      if (!playerPopup()) { clearInterval(menuKeepAlive); focused = null; refreshBar(true); return; }
+      revealControls();
+      hoverFocused();
+    }, 1200);
     refreshBar(true);
+  }
+
+  function closePlayerMenu() {
+    clearInterval(menuKeepAlive);
+    pressKey("Escape", "Escape", 27, document.body);
+    focused = null;
+    setTimeout(() => {
+      // Still open? Clicking the video area is what closes it for mouse users.
+      const popup = playerPopup();
+      if (popup) {
+        const video = document.querySelector("video");
+        if (video) video.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: 20, clientY: innerHeight / 2 }));
+      }
+      refreshBar(true);
+    }, 150);
+  }
+
+  function menuAction(action, popup) {
+    switch (action) {
+      case "up": case "down": case "left": case "right": {
+        const cands = menuCandidates(popup).filter((c) => c !== focused);
+        if (!focused || !focused.isConnected) { setFocus(cands[0], { scroll: false }); break; }
+        const next = findBest(focused.getBoundingClientRect(), cands, action);
+        if (next) {
+          setFocus(next, { scroll: false });
+          if (!inViewport(next.getBoundingClientRect())) next.scrollIntoView({ block: "nearest" });
+        }
+        break;
+      }
+      case "confirm":
+        if (focused && focused.isConnected) {
+          focused.click();
+          // Most menus close on pick; if this one stays open (episodes), keep navigating.
+          setTimeout(() => { if (!playerPopup()) { clearInterval(menuKeepAlive); focused = null; } refreshBar(true); }, 300);
+        }
+        break;
+      case "back": case "start":
+        closePlayerMenu();
+        break;
+    }
+    hoverFocused();
   }
 
   const SKIP_SELECTOR = [
@@ -950,25 +1057,21 @@
 
   function clickSkip() {
     const btn = findSkipButton();
-    if (btn) { btn.click(); toast("⏭ Skipped", 800); return; }
+    if (btn) { btn.click(); toast("Skipped", 800); return; }
     toast("Nothing to skip right now");
   }
 
   async function nextEpisode() {
-    revealControls();
-    await sleep(150);
-    const btn = document.querySelector('[data-uia="control-next"], [data-uia="next-episode-seamless-button"]');
-    if (btn) { btn.click(); toast("⏭ Next episode", 1000); }
+    const btn = await withControls(['[data-uia="control-next"]', '[data-uia="next-episode-seamless-button"]', '[data-uia*="next-episode"]', '[aria-label*="next episode" i]']);
+    if (btn) { btn.click(); toast("Next episode", 1000); }
     else toast("No next episode");
   }
 
   async function toggleFullscreen() {
-    revealControls();
-    await sleep(120);
-    const btn = document.querySelector(
-      document.fullscreenElement ? '[data-uia="control-fullscreen-exit"]' : '[data-uia="control-fullscreen-enter"]'
-    );
     const was = !!document.fullscreenElement;
+    const btn = await withControls(was
+      ? ['[data-uia="control-fullscreen-exit"]', '[data-uia*="fullscreen-exit"]', '[aria-label*="exit full" i]']
+      : ['[data-uia="control-fullscreen-enter"]', '[data-uia*="fullscreen-enter"]', '[aria-label*="full screen" i]', '[aria-label*="fullscreen" i]'], 900);
     if (btn) btn.click();
     await sleep(250);
     if (!!document.fullscreenElement !== was) return;
@@ -976,17 +1079,14 @@
       if (was) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch (e) {
-      toast("Firefox blocked fullscreen – press F11 (or double-click the video)", 2500);
+      toast("Firefox blocked fullscreen - press F11 (or double-click the video)", 2500);
     }
   }
 
-  function exitPlayer() {
-    revealControls();
-    setTimeout(() => {
-      const back = document.querySelector('[data-uia="control-nav-back"], [data-uia="nfplayer-exit"]');
-      if (back) back.click();
-      else history.back();
-    }, 120);
+  async function exitPlayer() {
+    const back = await withControls(['[data-uia="control-nav-back"]', '[data-uia="nfplayer-exit"]', '[data-uia*="nav-back"]', '[aria-label="Back" i]'], 900);
+    if (back) back.click();
+    else history.back();
   }
 
   // ------------------------------------------------- on-screen keyboard ----
@@ -1081,13 +1181,14 @@
       menus: [
         ["dpad", "Move"], ["confirm", "Select"], ["back", "Back / close"], ["x", "Search"],
         ["y", "My List (in details) · jump to top"], ["lb+rb", "Scroll row"], ["lt+rt", "Page up / down"],
-        ["rs", "Scroll page"], ["select", "Home"], ["start", "Help"], ["l3", "TV mode on / off"],
+        ["rs", "Scroll page"], ["select", "Home"], ["start", "Help"],
       ],
       watching: [
         ["confirm+start", "Play / pause"], ["dpad-h", `Seek ±${settings.seekSmall}s`],
-        ["lb+rb", `Seek ±${settings.seekLarge}s`], ["dpad-v", "Up: control bar (speed, subtitles, episodes…) · Down: volume −"],
-        ["lt+rt", "Volume − / +"], ["x", "Mute"],
-        ["y", "Skip intro / recap"], ["select", "Fullscreen"], ["back", "Exit player / back to video"],
+        ["lb+rb", `Seek ±${settings.seekLarge}s`], ["dpad-v", "Volume"], ["x", "Mute"],
+        ["y", "Skip intro / recap"], ["rt", "Next episode"], ["lt", "Audio & subtitles menu"],
+        ["r3", "Playback speed menu"], ["l3", "Episodes menu"], ["select", "Fullscreen"],
+        ["back", "Exit player (closes a menu first)"],
       ],
     };
     for (const [key, rows] of Object.entries(HELP)) {
@@ -1114,50 +1215,24 @@
       return;
     }
 
-    if (action === "l3") return toggleTvMode();
-
+  
     if (isPlayer()) {
-      if (ctrlMode) {
-        // Moving around Netflix's own control bar and its pop-up menus.
-        switch (action) {
-          case "left": case "right": case "up": return navigate(action);
-          case "down": {
-            // Down off the bottom row of controls = back to the video.
-            const cands = getCandidates().filter((c) => c !== focused);
-            const next = focused && findBest(focused.getBoundingClientRect(), cands, "down");
-            if (next) return setFocus(next, { scroll: false });
-            return exitCtrlMode();
-          }
-          case "confirm":
-            if (!focused || !focused.isConnected) return setFocus(pickInitial(getCandidates()), { scroll: false });
-            clickEl(focused);
-            // Menus (speed, subtitles, episodes) open on click: move into them.
-            setTimeout(() => { const p = playerPopup(); if (p) { const c = getCandidates().filter((el) => p.contains(el)); if (c.length) setFocus(pickInitial(c), { scroll: false }); } hoverFocused(); }, 250);
-            return;
-          case "back": {
-            if (playerPopup()) { pressKey("Escape", "Escape", 27, document.body); setTimeout(() => { if (playerPopup()) exitCtrlMode(); else hoverFocused(); }, 200); return; }
-            return exitCtrlMode();
-          }
-          case "start": return exitCtrlMode();
-          case "x": return toggleMute();
-          case "lt": return changeVolume(-settings.volumeStep);
-          case "rt": return changeVolume(settings.volumeStep);
-          case "select": return toggleFullscreen();
-        }
-        return;
-      }
+      const popup = playerPopup();
+      if (popup) return menuAction(action, popup);
       switch (action) {
         case "confirm": case "start": return togglePlay();
         case "left": return seek(-settings.seekSmall);
         case "right": return seek(settings.seekSmall);
         case "lb": return seek(-settings.seekLarge);
         case "rb": return seek(settings.seekLarge);
-        case "up": return enterCtrlMode();
+        case "up": return changeVolume(settings.volumeStep);
         case "down": return changeVolume(-settings.volumeStep);
-        case "lt": return changeVolume(-settings.volumeStep);
-        case "rt": return changeVolume(settings.volumeStep);
         case "x": return toggleMute();
         case "y": return clickSkip();
+        case "rt": return nextEpisode();
+        case "lt": return openPlayerMenu("subtitles");
+        case "r3": return openPlayerMenu("speed");
+        case "l3": return openPlayerMenu("episodes");
         case "select": return toggleFullscreen();
         case "back": return exitPlayer();
       }
@@ -1169,9 +1244,27 @@
     switch (action) {
       case "up": case "down": case "left": case "right":
         return navigate(action);
-      case "confirm":
+      case "confirm": {
         if (!focused || !focused.isConnected) return setFocus(pickInitial(getCandidates()));
-        return clickEl(focused);
+        const pickedMenuItem = focused.matches('[data-uia="dropdown-menu-item"], [role="menuitem"]');
+        const startsPlayback = focused.matches('[data-uia="titleCard--container"], [data-uia="play-button"], [data-uia="play-video-button"], a[href*="/watch/"]');
+        clickEl(focused);
+        if (startsPlayback) {
+          // Netflix takes ~0.5-1s to leave for the player; hold further input
+          // so a quick B doesn't close the dialog underneath it.
+          toast("Loading...", 1500);
+          transitioning = true;
+          waitFor(() => isPlayer() || null, { timeout: 2500 }).then(() => { transitioning = false; });
+        }
+        if (pickedMenuItem) {
+          // Season chosen: go back to the picker so Down lands on episode 1.
+          setTimeout(() => {
+            const toggle = (getModal() || document).querySelector('[data-uia="dropdown-toggle"]');
+            if (toggle && isUsable(toggle)) setFocus(toggle, { scroll: false });
+          }, 350);
+        }
+        return;
+      }
       case "back": return goBack();
       case "x": return openSearch();
       case "y":
@@ -1205,7 +1298,7 @@
       lastCtx = ctx;
       if (ctx === "modal") modalOpenedAt = performance.now();
       if (ctx !== "browse") clearTvFocus();
-      if (ctx !== "player" && ctrlMode) exitCtrlMode();
+      if (ctx !== "player") clearInterval(menuKeepAlive);
       if (controllerActive) {
         refreshBar(true);
         if (transitioning || isPlayer()) return;

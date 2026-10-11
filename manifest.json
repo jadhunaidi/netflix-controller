@@ -21,7 +21,7 @@
     "open_in_tab": true
   },
   "browser_action": {
-    "default_title": "Netflix Controller – settings & controller test",
+    "default_title": "Netflix Controller - settings & controller test",
     "default_icon": "icons/icon.svg"
   },
   "background": {

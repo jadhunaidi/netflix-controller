@@ -167,6 +167,7 @@
       case "lb": case "rb": case "lt": case "rt": return shoulder(btn, style);
       case "select": case "start": return system(btn, style);
       case "l3": return stick("l", "press");
+      case "r3": return stick("r", "press");
       case "rs": return stick("r", "move");
       default: return "";
     }

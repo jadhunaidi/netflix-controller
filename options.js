@@ -55,7 +55,7 @@
   let wizard = null; // { pad, index, baseline, waitRelease, bindings }
 
   function describeBinding(b) {
-    if (!b) return "—";
+    if (!b) return "-";
     if (b.type === "button") return `button ${b.index}`;
     if (b.type === "axis") return `axis ${b.index}${b.dir > 0 ? "+" : "−"}`;
     return `axis ${b.index} = ${b.value}`;
@@ -78,8 +78,8 @@
         $("pad-mapping").textContent = custom
           ? "Using your custom button layout."
           : pad.mapping === "standard"
-            ? "Standard layout detected – buttons should work out of the box."
-            : "Non-standard layout – using a generic guess. If buttons are wrong, click “Remap buttons”.";
+            ? "Standard layout detected - buttons should work out of the box."
+            : "Non-standard layout - using a generic guess. If buttons are wrong, click Remap buttons.";
       }
       const bindings = NFC.bindingsFor(pad, settings);
       for (const a of NFC.ACTIONS) {
@@ -93,7 +93,7 @@
     } else if (currentPadId !== null) {
       currentPadId = null;
       $("pad-status").className = "status waiting";
-      $("pad-name").textContent = "No controller detected — press any button on your controller.";
+      $("pad-name").textContent = "No controller detected - press any button on your controller.";
       $("pad-mapping").textContent = "";
     }
     requestAnimationFrame(frame);

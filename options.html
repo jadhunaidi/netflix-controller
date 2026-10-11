@@ -20,12 +20,12 @@
       <h2>Controller</h2>
       <div id="pad-status" class="status waiting">
         <span class="dot"></span>
-        <span id="pad-name">No controller detected — press any button on your controller (Firefox only exposes a controller after it's used).</span>
+        <span id="pad-name">No controller detected - press any button on your controller (Firefox only exposes a controller after it's used).</span>
       </div>
       <p id="pad-mapping" class="muted"></p>
 
       <h3>Live test</h3>
-      <p class="muted">Press buttons — the matching action lights up. If something is wrong, use <b>Remap buttons</b>.</p>
+      <p class="muted">Press buttons - the matching action lights up. If something is wrong, use <b>Remap buttons</b>.</p>
       <div id="actions" class="chips"></div>
 
       <details>
@@ -50,7 +50,7 @@
       <h2>Behaviour</h2>
       <label class="check"><input type="checkbox" data-key="enabled"> Enable controller on Netflix</label>
       <label class="check"><input type="checkbox" data-key="showHints"> Show controls bar at the bottom of the screen</label>
-      <label class="check"><input type="checkbox" data-key="tvMode"> TV mode – enlarged focused title, info panel, fixed row position, no hover pop-ups (toggle anytime by pressing the left stick)</label>
+      <label class="check"><input type="checkbox" data-key="tvMode"> TV mode: enlarged focused title, info panel, fixed row position, no hover pop-ups</label>
 
       <div class="glyph-row">
         <label>Button icons
@@ -72,9 +72,9 @@
           <input type="range" min="150" max="800" step="10" data-key="repeatDelay"></label>
         <label>Repeat speed (ms) <output data-for="repeatRate"></output>
           <input type="range" min="50" max="400" step="10" data-key="repeatRate"></label>
-        <label>Seek – D-pad (seconds) <output data-for="seekSmall"></output>
+        <label>Seek - D-pad (seconds) <output data-for="seekSmall"></output>
           <input type="range" min="5" max="60" step="5" data-key="seekSmall"></label>
-        <label>Seek – bumpers (seconds) <output data-for="seekLarge"></output>
+        <label>Seek - bumpers (seconds) <output data-for="seekLarge"></output>
           <input type="range" min="10" max="300" step="10" data-key="seekLarge"></label>
         <label>Volume step <output data-for="volumeStep"></output>
           <input type="range" min="0.02" max="0.25" step="0.01" data-key="volumeStep"></label>
@@ -98,7 +98,6 @@
             <tr><td>Right stick</td><td>Free scroll</td></tr>
             <tr><td>View / Select</td><td>Home</td></tr>
             <tr><td>Menu / Start</td><td>Help overlay</td></tr>
-            <tr><td>Press left stick (L3)</td><td>TV mode on / off</td></tr>
           </table>
         </div>
         <div>
@@ -107,10 +106,13 @@
             <tr><td>A / Start</td><td>Play / pause</td></tr>
             <tr><td>Left / Right</td><td>Seek (short)</td></tr>
             <tr><td>LB / RB</td><td>Seek (long)</td></tr>
-            <tr><td>Up</td><td>Netflix control bar: D-pad across play, seek, volume, subtitles, speed, episodes, next, fullscreen; A opens menus; B / Down back to video</td></tr>
-            <tr><td>Down · LT / RT</td><td>Volume</td></tr>
+            <tr><td>Up / Down</td><td>Volume</td></tr>
             <tr><td>X</td><td>Mute</td></tr>
-            <tr><td>Y</td><td>Skip intro / recap / next episode</td></tr>
+            <tr><td>Y</td><td>Skip intro / recap</td></tr>
+            <tr><td>RT</td><td>Next episode</td></tr>
+            <tr><td>LT</td><td>Audio &amp; subtitles menu (D-pad to choose, A select, B close)</td></tr>
+            <tr><td>Press right stick (R3)</td><td>Playback speed menu</td></tr>
+            <tr><td>Press left stick (L3)</td><td>Episodes menu</td></tr>
             <tr><td>View / Select</td><td>Fullscreen</td></tr>
             <tr><td>B</td><td>Exit player</td></tr>
           </table>
