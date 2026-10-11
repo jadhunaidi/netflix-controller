@@ -1,0 +1,11 @@
+# Build output and signed packages
+dist/
+signed/
+web-ext-artifacts/
+
+# Local scratch
+*.backup.js
+.claude/
+node_modules/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Netflix Controller Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon.svg" alt="" width="44" height="44">
+    <div>
+      <h1>Netflix Controller Navigator</h1>
+      <p class="sub">Settings, controller test &amp; button remapping</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Controller</h2>
+      <div id="pad-status" class="status waiting">
+        <span class="dot"></span>
+        <span id="pad-name">No controller detected — press any button on your controller (Firefox only exposes a controller after it's used).</span>
+      </div>
+      <p id="pad-mapping" class="muted"></p>
+
+      <h3>Live test</h3>
+      <p class="muted">Press buttons — the matching action lights up. If something is wrong, use <b>Remap buttons</b>.</p>
+      <div id="actions" class="chips"></div>
+
+      <details>
+        <summary>Raw input</summary>
+        <div id="raw" class="raw"></div>
+      </details>
+
+      <div class="row">
+        <button id="remap" class="primary">Remap buttons</button>
+        <button id="reset-map">Reset to default layout</button>
+      </div>
+      <div id="wizard" class="wizard" hidden>
+        <p id="wizard-step"></p>
+        <div class="row">
+          <button id="wizard-skip">Skip this one</button>
+          <button id="wizard-cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Behaviour</h2>
+      <label class="check"><input type="checkbox" data-key="enabled"> Enable controller on Netflix</label>
+      <label class="check"><input type="checkbox" data-key="showHints"> Show controls bar at the bottom of the screen</label>
+      <label class="check"><input type="checkbox" data-key="tvMode"> TV mode – enlarged focused title, info panel, fixed row position, no hover pop-ups (toggle anytime by pressing the left stick)</label>
+
+      <div class="glyph-row">
+        <label>Button icons
+          <select id="glyphs">
+            <option value="auto">Auto-detect from controller</option>
+            <option value="xbox">Xbox</option>
+            <option value="playstation">PlayStation</option>
+            <option value="nintendo">Nintendo</option>
+            <option value="generic">Generic (button positions)</option>
+          </select>
+        </label>
+        <div id="glyph-preview" class="glyph-preview"></div>
+      </div>
+
+      <div class="grid">
+        <label>Stick deadzone <output data-for="deadzone"></output>
+          <input type="range" min="0.1" max="0.8" step="0.05" data-key="deadzone"></label>
+        <label>Hold delay before repeat (ms) <output data-for="repeatDelay"></output>
+          <input type="range" min="150" max="800" step="10" data-key="repeatDelay"></label>
+        <label>Repeat speed (ms) <output data-for="repeatRate"></output>
+          <input type="range" min="50" max="400" step="10" data-key="repeatRate"></label>
+        <label>Seek – D-pad (seconds) <output data-for="seekSmall"></output>
+          <input type="range" min="5" max="60" step="5" data-key="seekSmall"></label>
+        <label>Seek – bumpers (seconds) <output data-for="seekLarge"></output>
+          <input type="range" min="10" max="300" step="10" data-key="seekLarge"></label>
+        <label>Volume step <output data-for="volumeStep"></output>
+          <input type="range" min="0.02" max="0.25" step="0.01" data-key="volumeStep"></label>
+      </div>
+      <p id="saved" class="muted saved">Saved</p>
+    </section>
+
+    <section class="card">
+      <h2>Controls</h2>
+      <div class="two">
+        <div>
+          <h3>Menus</h3>
+          <table>
+            <tr><td>D-pad / Left stick</td><td>Move highlight</td></tr>
+            <tr><td>A</td><td>Select</td></tr>
+            <tr><td>B</td><td>Back / close details</td></tr>
+            <tr><td>X</td><td>Search (on-screen keyboard)</td></tr>
+            <tr><td>Y</td><td>Add/remove My List (in details) · jump to top</td></tr>
+            <tr><td>LB / RB</td><td>Scroll the current row</td></tr>
+            <tr><td>LT / RT</td><td>Page up / down</td></tr>
+            <tr><td>Right stick</td><td>Free scroll</td></tr>
+            <tr><td>View / Select</td><td>Home</td></tr>
+            <tr><td>Menu / Start</td><td>Help overlay</td></tr>
+            <tr><td>Press left stick (L3)</td><td>TV mode on / off</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>Watching</h3>
+          <table>
+            <tr><td>A / Start</td><td>Play / pause</td></tr>
+            <tr><td>Left / Right</td><td>Seek (short)</td></tr>
+            <tr><td>LB / RB</td><td>Seek (long)</td></tr>
+            <tr><td>Up / Down</td><td>Volume</td></tr>
+            <tr><td>X</td><td>Mute</td></tr>
+            <tr><td>Y</td><td>Skip intro / recap / next episode</td></tr>
+            <tr><td>RT</td><td>Next episode</td></tr>
+            <tr><td>View / Select</td><td>Fullscreen</td></tr>
+            <tr><td>B</td><td>Exit player</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="gamepad-core.js"></script>
+  <script src="glyphs.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

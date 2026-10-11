@@ -1,0 +1,154 @@
+html.nfc-active, html.nfc-active * { cursor: none !important; }
+
+#nfc-root {
+  --s: 1; /* UI scale; TV mode makes everything bigger for couch distance */
+  position: fixed; inset: 0; pointer-events: none; z-index: 2147483647;
+  font-family: "Netflix Sans", "Helvetica Neue", Segoe UI, Roboto, Arial, sans-serif;
+  color: #fff;
+}
+html.nfc-tv #nfc-root { --s: 1.3; }
+#nfc-root [hidden] { display: none !important; }
+
+/* Focus ring */
+.nfc-ring {
+  position: fixed; left: 0; top: 0;
+  border: 3px solid #fff; border-radius: 8px;
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, .9), 0 0 24px 6px rgba(229, 9, 20, .55);
+  transition: transform 110ms ease-out, width 110ms ease-out, height 110ms ease-out;
+  will-change: transform;
+}
+html.nfc-tv .nfc-ring {
+  border-width: 4px; border-radius: 10px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, .6), 0 0 30px 4px rgba(255, 255, 255, .35);
+}
+
+/* Toast (player feedback, messages) */
+.nfc-toast {
+  position: fixed; top: 9vh; left: 50%; transform: translate(-50%, -8px);
+  background: rgba(20, 20, 20, .88); border: 1px solid rgba(255, 255, 255, .15);
+  padding: calc(12px * var(--s)) calc(22px * var(--s)); border-radius: 999px;
+  font-size: calc(20px * var(--s)); font-weight: 600;
+  letter-spacing: .2px; white-space: nowrap; opacity: 0;
+  transition: opacity 200ms, transform 200ms;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+}
+.nfc-toast.nfc-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Controls bar – console-style button prompts along the bottom of the screen */
+.nfc-bar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;
+  gap: calc(10px * var(--s)) calc(30px * var(--s));
+  padding: calc(46px * var(--s)) 4vw calc(22px * var(--s));
+  background: linear-gradient(to top, rgba(0, 0, 0, .86) 0%, rgba(0, 0, 0, .55) 55%, rgba(0, 0, 0, 0) 100%);
+  font-size: calc(17px * var(--s));
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+.nfc-bar.nfc-hide, html:not(.nfc-active) .nfc-bar { opacity: 0; transform: translateY(14px); }
+.nfc-bar-item { display: flex; align-items: center; gap: calc(10px * var(--s)); }
+.nfc-bar-label {
+  color: #fff; font-weight: 500; letter-spacing: .2px; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
+}
+
+/* Button glyphs (SVG from glyphs.js) */
+.nfc-glyph-wrap {
+  display: inline-flex; transition: transform 90ms ease-out, filter 90ms ease-out;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+}
+.nfc-glyph-wrap + .nfc-glyph-wrap { margin-left: calc(4px * var(--s)); }
+.nfc-glyph { display: block; width: calc(34px * var(--s)); height: calc(34px * var(--s)); }
+.nfc-glyph.nfc-wide { width: calc(46.75px * var(--s)); }
+.nfc-glyph-wrap.nfc-pressed {
+  transform: scale(.84);
+  filter: brightness(1.45) drop-shadow(0 0 8px rgba(255, 255, 255, .55));
+}
+
+/* Help overlay */
+.nfc-help {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
+  display: flex; align-items: center; justify-content: center;
+}
+.nfc-help-card {
+  background: #181818; border-radius: 14px; padding: 28px 36px; max-width: 900px; width: 90vw;
+  max-height: 92vh; overflow: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .7); border-top: 4px solid #e50914;
+}
+.nfc-help-card h2 { margin: 0 0 18px; font-size: calc(26px * var(--s)); }
+.nfc-help-card h3 { margin: 0 0 10px; font-size: calc(15px * var(--s)); color: #e50914; text-transform: uppercase; letter-spacing: 1px; }
+.nfc-help-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.nfc-help-card dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: calc(15px * var(--s)); }
+.nfc-help-card dt { display: flex; align-items: center; justify-content: flex-end; }
+.nfc-help-card dd { align-self: center; }
+.nfc-help-card .nfc-glyph { width: calc(30px * var(--s)); height: calc(30px * var(--s)); }
+.nfc-help-card .nfc-glyph.nfc-wide { width: calc(41.25px * var(--s)); }
+.nfc-help-card dd { margin: 0; color: #bcbcbc; }
+.nfc-help-foot { margin: 22px 0 0; color: #bcbcbc; font-size: calc(15px * var(--s)); display: flex; gap: 10px; align-items: center; justify-content: center; }
+
+/* On-screen keyboard */
+.nfc-osk {
+  position: fixed; left: 50%; bottom: calc(100px * var(--s)); transform: translateX(-50%);
+  background: rgba(24, 24, 24, .97); border-radius: 14px; padding: calc(18px * var(--s));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .7); border-top: 4px solid #e50914;
+}
+.nfc-osk-field {
+  background: #333; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;
+  font-size: calc(22px * var(--s)); min-height: calc(30px * var(--s)); display: flex; align-items: center;
+}
+.nfc-osk-caret { width: 2px; height: calc(24px * var(--s)); background: #fff; margin-left: 2px; animation: nfc-blink 1s steps(1) infinite; }
+@keyframes nfc-blink { 50% { opacity: 0; } }
+.nfc-osk-row { display: flex; gap: calc(6px * var(--s)); margin-bottom: calc(6px * var(--s)); justify-content: center; }
+.nfc-osk-key {
+  width: calc(46px * var(--s)); height: calc(46px * var(--s));
+  display: flex; align-items: center; justify-content: center;
+  background: #2f2f2f; border-radius: 6px; font-size: calc(20px * var(--s)); font-weight: 600;
+  transition: background 80ms, transform 80ms;
+}
+.nfc-osk-wide { width: calc(156px * var(--s)); font-size: calc(16px * var(--s)); }
+.nfc-osk-key.nfc-osk-sel { background: #fff; color: #141414; transform: scale(1.08); }
+.nfc-osk-legend { text-align: center; color: #8c8c8c; font-size: calc(13px * var(--s)); margin-top: 8px; }
+
+/* ------------------------------------------------------------ TV mode -- */
+
+/* Only while the controller is in use – moving the mouse restores the normal site. */
+html:not(.nfc-active) .nfc-lift,
+html:not(.nfc-active) .nfc-info { display: none !important; }
+
+/* Enlarged copy of the focused card, drawn over the page. */
+.nfc-lift {
+  position: fixed; left: 0; top: 0; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .8);
+  transition: transform 110ms ease-out, width 110ms ease-out, height 110ms ease-out;
+  will-change: transform;
+}
+.nfc-lift img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* Dim the other cards in the focused row. */
+html.nfc-tv.nfc-active .nfc-tv-dim .slider-item { transition: opacity 160ms; }
+html.nfc-tv.nfc-active .nfc-tv-dim .slider-item:not(.nfc-tv-cur) { opacity: .45; }
+
+/* No hover pop-ups: the page ignores the (hidden) mouse until it moves again. */
+html.nfc-tv.nfc-active body { pointer-events: none !important; }
+html.nfc-tv.nfc-active .previewModal--wrapper.mini-modal { display: none !important; }
+
+/* Title info panel. */
+.nfc-info {
+  position: fixed; top: 72px; left: 0; width: min(48vw, 820px);
+  padding: 20px 48px 44px 4vw;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .95) 0%, rgba(0, 0, 0, .82) 60%, rgba(0, 0, 0, 0) 100%);
+  animation: nfc-fade 180ms ease-out;
+}
+@keyframes nfc-fade { from { opacity: 0; transform: translateY(-4px); } }
+.nfc-info-row {
+  color: #e50914; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+  font-size: clamp(12px, .9vw, 16px);
+}
+.nfc-info-title {
+  font-size: clamp(26px, 2.8vw, 52px); font-weight: 800; line-height: 1.08;
+  margin: 6px 0 10px; text-shadow: 0 2px 10px rgba(0, 0, 0, .6);
+}
+.nfc-info-meta { color: #46d369; font-weight: 700; font-size: clamp(14px, 1vw, 19px); margin-bottom: 8px; }
+.nfc-info-desc {
+  color: #e5e5e5; font-size: clamp(15px, 1.2vw, 22px); line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}

@@ -1,0 +1,37 @@
+{
+  "manifest_version": 2,
+  "name": "Netflix Controller Navigator",
+  "version": "1.2.0",
+  "description": "Navigate Netflix menus and control playback with a gamepad (Xbox, 8BitDo, PlayStation or any generic controller).",
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "permissions": ["storage", "*://*.netflix.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.netflix.com/*"],
+      "js": ["gamepad-core.js", "glyphs.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "browser_action": {
+    "default_title": "Netflix Controller – settings & controller test",
+    "default_icon": "icons/icon.svg"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "netflix-controller@local.extension",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  }
+}
