@@ -9,3 +9,6 @@ web-ext-artifacts/
 node_modules/
 Thumbs.db
 .DS_Store
+
+# web-ext upload tracker
+.amo-upload-uuid

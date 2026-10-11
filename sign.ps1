@@ -29,7 +29,7 @@ $env:WEB_EXT_API_SECRET = Read-Secret "JWT secret"
 New-Item -ItemType Directory -Force signed | Out-Null
 try {
     npx --yes web-ext@8 sign --channel=unlisted --source-dir . --artifacts-dir signed `
-        --ignore-files "dist/**" "signed/**" "sign.ps1" "TODO.md"
+        --ignore-files "dist/**" "signed/**" "sign.ps1" "TODO.md" "README.md" ".gitignore" ".git/**" ".amo-upload-uuid" "*.backup.js"
     if ($LASTEXITCODE -ne 0) { throw "web-ext sign failed (exit code $LASTEXITCODE)" }
 }
 finally {
