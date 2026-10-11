@@ -300,10 +300,13 @@
 
   function getCandidates() {
     const scope = getModal() || document;
-    const all = Array.from(scope.querySelectorAll(FOCUSABLE)).filter(isUsable);
-    // Nested focusables are one control. Keep the outer one when the inner
-    // fills it (Netflix puts a plain <button> inside its play-button link);
-    // otherwise keep the inner (a tabindex wrapper around a small link).
+    return dedupeNested(Array.from(scope.querySelectorAll(FOCUSABLE)).filter(isUsable));
+  }
+
+  // Nested focusables are one control. Keep the outer one when the inner
+  // fills it (Netflix puts a plain <button> inside its play-button link);
+  // otherwise keep the inner (a tabindex wrapper around a small link).
+  function dedupeNested(all) {
     const set = new Set(all);
     const drop = new Set();
     const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
@@ -842,9 +845,10 @@
     try {
       if (p) {
         const dur = p.getDuration();
-        const t = Math.min(Math.max(0, p.getCurrentTime() + seconds * 1000), dur - 1000);
+        let t = Math.max(0, p.getCurrentTime() + seconds * 1000);
+        if (dur > 0) t = Math.min(t, dur - 1000);
         p.seek(t);
-        toast(`${seconds > 0 ? "+" : ""}${seconds}s  ${fmt(t / 1000)} / ${fmt(dur / 1000)}`, 1000);
+        toast(`${seconds > 0 ? "+" : ""}${seconds}s  ${fmt(t / 1000)}${dur > 0 ? " / " + fmt(dur / 1000) : ""}`, 1000);
         return;
       }
     } catch (e) { /* fall through */ }
@@ -907,6 +911,7 @@
 
   // Bring the bar up and wait until one of `selectors` is actually mounted
   // and usable (the new player adds its buttons a moment after the bar shows).
+  const loggedMissing = new Set();
   async function withControls(selectors, timeout = 1800) {
     const find = () => selectors.map((sel) => document.querySelector(sel)).find((b) => b && isUsable(b)) || null;
     const t0 = performance.now();
@@ -916,9 +921,9 @@
       await sleep(120);
       btn = find();
     }
-    if (!btn) {
-      console.info("[NetflixController] control not found for", selectors.join(" | "),
-        "- data-uia on page:", Array.from(document.querySelectorAll("[data-uia]")).map((e) => e.getAttribute("data-uia")).join(", "));
+    if (!btn && !loggedMissing.has(selectors[0])) {
+      loggedMissing.add(selectors[0]);
+      console.debug("[NetflixController] control not found for", selectors.join(" | "));
     }
     return btn;
   }
@@ -929,20 +934,31 @@
 
   let menuKeepAlive = 0;
 
-  // A pop-up menu opened from the control bar (speed, audio & subtitles, episodes).
-  function playerPopup() {
-    const sel = '[role="menu"], [role="listbox"], [role="dialog"], .popup-content, [data-uia*="popup"], [data-uia*="menu"], [data-uia*="selector"], [data-uia$="-controls"], [data-uia*="playback-speed"], [data-uia*="episodes"]';
-    // Items carry the same names as their menu (playback-speed-item inside
-    // playback-speed), so never accept an item and prefer the outermost box.
-    const ITEM = 'button, [role="button"], [role="menuitem"], [role="option"], [role="radio"], [data-uia^="control-"], [data-uia$="-item"], [data-uia$="-item-active"], [data-uia$="-label"], [data-uia$="-indicator"]';
+  // A pop-up menu opened from the control bar (speed, audio & subtitles,
+  // episodes): a box that holds several options (or a slider) and none of the
+  // bar's own control-* buttons. Outermost such box wins, so an option that
+  // shares its menu's name (playback-speed-item) is never taken for the menu.
+  const POPUP_SEL = '[role="menu"], [role="listbox"], [role="dialog"], .popup-content, [data-uia*="popup"], [data-uia*="menu"], [data-uia*="selector"], [data-uia$="-controls"], [data-uia*="playback-speed"], [data-uia*="episodes"]';
+  function findPlayerPopup() {
     let best = null;
-    for (const el of document.querySelectorAll(sel)) {
-      if (el.closest("#nfc-root") || el.matches(ITEM)) continue;
+    for (const el of document.querySelectorAll(POPUP_SEL)) {
+      if (el.closest("#nfc-root") || el.querySelector('[data-uia^="control-"]')) continue;
       const r = el.getBoundingClientRect();
       if (!(r.width > 120 && r.height > 80 && r.width * r.height < innerWidth * innerHeight * 0.7)) continue;
+      if (!menuSlider(el) && menuCandidates(el).length < 2) continue;
       if (!best || el.contains(best)) best = el;
     }
     return best;
+  }
+
+  // Cheap, cached view of the popup for the per-frame ring and the 300ms
+  // bar refresh; only meaningful while we are in a menu we opened.
+  let popupCache = { at: 0, el: null };
+  function playerPopup() {
+    if (!menuMode) return null;
+    const now = performance.now();
+    if (now - popupCache.at > 150) popupCache = { at: now, el: findPlayerPopup() };
+    return popupCache.el;
   }
 
   // Pretend the mouse is resting on the highlighted control, so hover-only
@@ -970,41 +986,35 @@
   const MENU_CONTAINER_SEL = '[role="menu"], [role="listbox"], [role="radiogroup"], [role="group"], [role="dialog"], ul, ol';
 
   function menuCandidates(popup) {
-    const all = Array.from(popup.querySelectorAll(MENU_ITEM_SEL))
-      .filter((el) => !el.matches(MENU_CONTAINER_SEL) && isUsable(el));
-    const set = new Set(all), drop = new Set();
-    const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
-    for (const el of all) {
-      let p = el.parentElement;
-      for (let d = 0; p && d < 25; d++, p = p.parentElement) {
-        if (!set.has(p)) continue;
-        if (area(el) >= area(p) * 0.8) drop.add(el); else drop.add(p);
-        break;
-      }
-    }
-    return all.filter((el) => !drop.has(el));
+    return dedupeNested(Array.from(popup.querySelectorAll(MENU_ITEM_SEL))
+      .filter((el) => !el.matches(MENU_CONTAINER_SEL) && isUsable(el)));
   }
 
-  async function openPlayerMenu(kind) {
-    const open = playerPopup();
-    if (open) { closePlayerMenu(); await sleep(250); }
-    const btn = await withControls(MENU_BUTTONS[kind]);
-    if (!btn) { toast(`${MENU_NAMES[kind]} button not found`); return; }
+  // Which menu the user is in, even if Netflix has hidden it for the moment.
+  let menuMode = null;
+  const CURRENT_ITEM_SEL = '[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], [data-uia$="-active"], .selected';
+
+  // Click the bar button for `kind`, wait for its menu and highlight the
+  // current choice. Used both for the first open and to bring a menu back
+  // after Netflix auto-hid it. Returns the popup element, or null.
+  async function openMenu(kind, timeout = 1500) {
+    const btn = await withControls(MENU_BUTTONS[kind], timeout);
+    if (!btn) return null;
     btn.click();
-    const popup = await waitFor(playerPopup, { timeout: 1500 });
-    if (!popup) { toast(`${MENU_NAMES[kind]} menu didn't open`); return; }
+    menuMode = kind;
+    const popup = await waitFor(findPlayerPopup, { timeout });
+    if (!popup) { menuMode = null; return null; }
+    popupCache = { at: performance.now(), el: popup };
     const slider = menuSlider(popup);
-    const cands = slider ? null : await waitFor(() => { const c = menuCandidates(popup); return c.length ? c : null; }, { timeout: 1000 });
     if (slider) {
       setFocus(slider, { scroll: false });
-      toast(sliderLabel(slider) || "Left / Right to adjust", 1200);
-    } else if (cands) {
-      // Start on the current choice (ticked / selected item) when there is one.
-      const current = cands.find((c) => c.matches('[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], [data-uia$="-active"], .selected'));
-      setFocus(current || cands[0], { scroll: false });
-      hoverFocused();
+    } else {
+      const cands = await waitFor(() => { const c = menuCandidates(popup); return c.length ? c : null; }, { timeout: 1000 });
+      if (cands) {
+        setFocus(cands.find((c) => c.matches(CURRENT_ITEM_SEL)) || cands[0], { scroll: false });
+        hoverFocused();
+      }
     }
-    menuMode = kind;
     clearInterval(menuKeepAlive);
     // Netflix hides the bar (and the menu with it) after a few idle seconds;
     // keep the pretend mouse resting on the highlighted item, inside the menu.
@@ -1013,31 +1023,23 @@
       if (playerPopup()) hoverFocused();
     }, 700);
     refreshBar(true);
-  }
-
-  // Which menu the user is in, even if Netflix has hidden it for the moment.
-  let menuMode = null;
-
-  // The menu got auto-hidden under us: bring it back before applying a press.
-  async function reopenMenu(kind) {
-    const btn = await withControls(MENU_BUTTONS[kind], 1200);
-    if (!btn) return null;
-    btn.click();
-    const popup = await waitFor(playerPopup, { timeout: 1200 });
-    if (popup) {
-      const slider = menuSlider(popup);
-      if (slider) setFocus(slider, { scroll: false });
-      else {
-        const cands = menuCandidates(popup);
-        const current = cands.find((c) => c.matches('[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], [data-uia$="-active"], .selected'));
-        if (cands.length) setFocus(current || cands[0], { scroll: false });
-      }
-    }
     return popup;
   }
 
+  async function openPlayerMenu(kind) {
+    if (playerPopup()) { closePlayerMenu(); await sleep(250); }
+    const popup = await openMenu(kind);
+    if (!popup) { toast(`${MENU_NAMES[kind]} menu not available`); return; }
+    const slider = menuSlider(popup);
+    if (slider) toast(sliderLabel(slider) || "Left / Right to adjust", 1200);
+  }
+
+  // The menu got auto-hidden under us: bring it back before applying a press.
+  const reopenMenu = (kind) => openMenu(kind, 1200);
+
   function closePlayerMenu() {
     menuMode = null;
+    popupCache = { at: 0, el: null };
     clearInterval(menuKeepAlive);
     pressKey("Escape", "Escape", 27, document.body);
     focused = null;
@@ -1107,10 +1109,15 @@
     '[data-uia="next-episode-seamless-button-draining"]', '[data-uia*="skip"]',
   ].join(",");
 
+  let skipCache = { at: 0, el: null };
   function findSkipButton() {
-    return document.querySelector(SKIP_SELECTOR) ||
+    const now = performance.now();
+    if (now - skipCache.at < 250) return skipCache.el;
+    const el = document.querySelector(SKIP_SELECTOR) ||
       Array.from(document.querySelectorAll("button")).find((b) =>
         /skip (intro|recap|credits)|next episode/i.test(b.textContent)) || null;
+    skipCache = { at: now, el };
+    return el;
   }
 
   function clickSkip() {
@@ -1142,7 +1149,7 @@
   }
 
   async function exitPlayer() {
-    const back = await withControls(['[data-uia="control-nav-back"]', '[data-uia="nfplayer-exit"]', '[data-uia*="nav-back"]', '[aria-label="Back" i]'], 900);
+    const back = await withControls(['[data-uia="control-nav-back"]', '[data-uia="nfplayer-exit"]', '[data-uia*="nav-back"]', '[aria-label="Back" i]'], 400);
     if (back) back.click();
     else history.back();
   }
@@ -1256,8 +1263,12 @@
     helpEl.querySelector(".nfc-help-foot").innerHTML = `${glyphGroup("back", style)}<span>Close</span>`;
   }
 
-  function onAction(action) {
+  function onAction(action, meta = {}) {
     if (!settings.enabled || document.visibilityState !== "visible") return;
+    // Held buttons repeat for moving/seeking/scrolling only; a long press of
+    // RT or LT must not fire next-episode or open a menu several times.
+    const direction = /^(up|down|left|right)$/.test(action);
+    if (meta.repeat && !direction && !(/^(lt|rt)$/.test(action) && !isPlayer() && !osk.open)) return;
     markControllerActive();
     flashGlyph(action);
     handleAction(action);
@@ -1312,14 +1323,20 @@
       case "confirm": {
         if (!focused || !focused.isConnected) return setFocus(pickInitial(getCandidates()));
         const pickedMenuItem = focused.matches('[data-uia="dropdown-menu-item"], [role="menuitem"]');
-        const startsPlayback = focused.matches('[data-uia="titleCard--container"], [data-uia="play-button"], [data-uia="play-video-button"], a[href*="/watch/"]');
+        const startsPlayback = focused.matches('[data-uia="titleCard--container"], [data-uia="play-button"], [data-uia="play-video-button"]');
+        const urlBefore = location.href;
         clickEl(focused);
         if (startsPlayback) {
           // Netflix takes ~0.5-1s to leave for the player; hold further input
-          // so a quick B doesn't close the dialog underneath it.
-          toast("Loading...", 1500);
+          // so a quick B doesn't close the dialog underneath it. Give up as
+          // soon as it is clear nothing is loading.
           transitioning = true;
-          waitFor(() => isPlayer() || null, { timeout: 2500 }).then(() => { transitioning = false; });
+          waitFor(() => location.href !== urlBefore || null, { timeout: 1200 }).then((moved) => {
+            transitioning = false;
+            if (!moved) return;
+            toast("Loading...", 1200);
+            waitFor(() => isPlayer() || null, { timeout: 2500 });
+          });
         }
         if (pickedMenuItem) {
           // Season chosen: go back to the picker so Down lands on episode 1.
@@ -1331,7 +1348,9 @@
         return;
       }
       case "back": return goBack();
-      case "x": return openSearch();
+      case "x":
+        if (getModal()) { goBack().then(openSearch); return; }
+        return openSearch();
       case "y":
         if (getModal() && toggleMyList()) return;
         window.scrollTo({ top: 0, behavior: "smooth" });

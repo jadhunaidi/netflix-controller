@@ -108,6 +108,7 @@
 - [x] On-screen keyboard for search
 - [x] Settings page with live controller test and button-remap wizard
 - [x] TV mode: lifted focus card, row dimming, title info panel, fixed focus row, no hover pop-ups, larger UI; L3 toggle and settings checkbox
+- [x] Review fixes (2026-10-12): no repeat-fire of RT/LT in the player, menu detection is structural and only active in a menu we opened, popup/skip lookups cached, seek safe before duration is known, shorter playback lock, X closes a title dialog before searching, shared nested-focusable dedupe, one open-menu routine, quiet control-lookup logging
 - [x] Title dialog fixes: use the outermost dialog (a nested details section used to swallow the Play button), skip cast/genre/rating text links, horizontal moves stay on one line, B closes an open season menu first, Loading state after pressing A on an episode
 - [x] Ported to Netflix's new UI (carousel-row-section / standard-card / hawkins arrows / nav search input) and verified on the live site
 - [x] Back navigation rework: waits for the modal/page to actually change instead of fixed delays, per-page focus memory (kept across reloads) so B returns to the exact card, double-press guard, row paging waits for the slide to settle
