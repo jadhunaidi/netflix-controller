@@ -1,4 +1,6 @@
 html.nfc-active, html.nfc-active * { cursor: none !important; }
+/* Our ring is the focus indicator; hide the page's own keyboard-focus outline meanwhile. */
+html.nfc-active *:focus, html.nfc-active *:focus-visible, html.nfc-active .focus-visible { outline: none !important; }
 
 #nfc-root {
   --s: 1; /* UI scale; TV mode makes everything bigger for couch distance */

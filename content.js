@@ -460,7 +460,9 @@
     if (!el) return;
     focused = el;
     lastRect = el.getBoundingClientRect();
-    try { el.focus({ preventScroll: true }); } catch (e) { /* not focusable */ }
+    // Inside player menus we click items directly; real focus would only add
+    // Netflix's own outline on top of ours.
+    if (!isPlayer()) { try { el.focus({ preventScroll: true }); } catch (e) { /* not focusable */ } }
     rememberFocus(el);
     const isCard = updateTvFocus(el);
     if (!scroll) return;
@@ -929,12 +931,18 @@
 
   // A pop-up menu opened from the control bar (speed, audio & subtitles, episodes).
   function playerPopup() {
-    const sel = '[role="menu"], [role="listbox"], [role="dialog"], [data-uia*="popup"], [data-uia*="menu"], [data-uia*="selector"], [data-uia="audio-subtitle-controls"], [data-uia*="playback-speed"], [data-uia*="episodes"]';
-    return Array.from(document.querySelectorAll(sel)).reverse().find((el) => {
-      if (el.closest("#nfc-root") || el.matches("button, [data-uia^='control-']")) return false;
+    const sel = '[role="menu"], [role="listbox"], [role="dialog"], .popup-content, [data-uia*="popup"], [data-uia*="menu"], [data-uia*="selector"], [data-uia$="-controls"], [data-uia*="playback-speed"], [data-uia*="episodes"]';
+    // Items carry the same names as their menu (playback-speed-item inside
+    // playback-speed), so never accept an item and prefer the outermost box.
+    const ITEM = 'button, [role="button"], [role="menuitem"], [role="option"], [role="radio"], [data-uia^="control-"], [data-uia$="-item"], [data-uia$="-item-active"], [data-uia$="-label"], [data-uia$="-indicator"]';
+    let best = null;
+    for (const el of document.querySelectorAll(sel)) {
+      if (el.closest("#nfc-root") || el.matches(ITEM)) continue;
       const r = el.getBoundingClientRect();
-      return r.width > 120 && r.height > 80 && r.width * r.height < innerWidth * innerHeight * 0.7;
-    }) || null;
+      if (!(r.width > 120 && r.height > 80 && r.width * r.height < innerWidth * innerHeight * 0.7)) continue;
+      if (!best || el.contains(best)) best = el;
+    }
+    return best;
   }
 
   // Pretend the mouse is resting on the highlighted control, so hover-only
@@ -985,24 +993,51 @@
     btn.click();
     const popup = await waitFor(playerPopup, { timeout: 1500 });
     if (!popup) { toast(`${MENU_NAMES[kind]} menu didn't open`); return; }
-    const cands = await waitFor(() => { const c = menuCandidates(popup); return c.length ? c : null; }, { timeout: 1000 });
-    if (cands) {
+    const slider = menuSlider(popup);
+    const cands = slider ? null : await waitFor(() => { const c = menuCandidates(popup); return c.length ? c : null; }, { timeout: 1000 });
+    if (slider) {
+      setFocus(slider, { scroll: false });
+      toast(sliderLabel(slider) || "Left / Right to adjust", 1200);
+    } else if (cands) {
       // Start on the current choice (ticked / selected item) when there is one.
-      const current = cands.find((c) => c.matches('[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], .selected'));
+      const current = cands.find((c) => c.matches('[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], [data-uia$="-active"], .selected'));
       setFocus(current || cands[0], { scroll: false });
       hoverFocused();
     }
+    menuMode = kind;
     clearInterval(menuKeepAlive);
-    // Netflix hides the bar (and the menu with it) after a few idle seconds.
+    // Netflix hides the bar (and the menu with it) after a few idle seconds;
+    // keep the pretend mouse resting on the highlighted item, inside the menu.
     menuKeepAlive = setInterval(() => {
-      if (!playerPopup()) { clearInterval(menuKeepAlive); focused = null; refreshBar(true); return; }
-      revealControls();
-      hoverFocused();
-    }, 1200);
+      if (!menuMode) { clearInterval(menuKeepAlive); return; }
+      if (playerPopup()) hoverFocused();
+    }, 700);
     refreshBar(true);
   }
 
+  // Which menu the user is in, even if Netflix has hidden it for the moment.
+  let menuMode = null;
+
+  // The menu got auto-hidden under us: bring it back before applying a press.
+  async function reopenMenu(kind) {
+    const btn = await withControls(MENU_BUTTONS[kind], 1200);
+    if (!btn) return null;
+    btn.click();
+    const popup = await waitFor(playerPopup, { timeout: 1200 });
+    if (popup) {
+      const slider = menuSlider(popup);
+      if (slider) setFocus(slider, { scroll: false });
+      else {
+        const cands = menuCandidates(popup);
+        const current = cands.find((c) => c.matches('[aria-checked="true"], [aria-selected="true"], [data-uia*="selected"], [data-uia$="-active"], .selected'));
+        if (cands.length) setFocus(current || cands[0], { scroll: false });
+      }
+    }
+    return popup;
+  }
+
   function closePlayerMenu() {
+    menuMode = null;
     clearInterval(menuKeepAlive);
     pressKey("Escape", "Escape", 27, document.body);
     focused = null;
@@ -1017,7 +1052,30 @@
     }, 150);
   }
 
+  // Netflix's playback-speed control is a slider: one element, moved with arrows.
+  const menuSlider = (popup) => popup.querySelector('input[type="range"], [role="slider"]');
+  const sliderLabel = (s) => s.getAttribute("aria-valuetext") || (s.matches("input") ? s.value : s.getAttribute("aria-valuenow")) || "";
+
+  function stepSlider(slider, dir) {
+    if (slider.matches('input[type="range"]')) {
+      const step = parseFloat(slider.step) || 1, min = parseFloat(slider.min) || 0, max = isNaN(parseFloat(slider.max)) ? 100 : parseFloat(slider.max);
+      const v = Math.min(max, Math.max(min, parseFloat(slider.value) + dir * step));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(slider, String(v));
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      slider.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      try { slider.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+      const key = dir > 0 ? "ArrowRight" : "ArrowLeft";
+      pressKey(key, key, dir > 0 ? 39 : 37, slider);
+    }
+    setFocus(slider, { scroll: false });
+    setTimeout(() => { const l = sliderLabel(slider); if (l) toast(l, 900); }, 60);
+  }
+
   function menuAction(action, popup) {
+    const slider = menuSlider(popup);
+    if (slider && (action === "left" || action === "right")) return stepSlider(slider, action === "right" ? 1 : -1);
+    if (slider && (action === "confirm" || action === "back" || action === "start")) return closePlayerMenu();
     switch (action) {
       case "up": case "down": case "left": case "right": {
         const cands = menuCandidates(popup).filter((c) => c !== focused);
@@ -1033,7 +1091,7 @@
         if (focused && focused.isConnected) {
           focused.click();
           // Most menus close on pick; if this one stays open (episodes), keep navigating.
-          setTimeout(() => { if (!playerPopup()) { clearInterval(menuKeepAlive); focused = null; } refreshBar(true); }, 300);
+          setTimeout(() => { if (!playerPopup()) { menuMode = null; clearInterval(menuKeepAlive); focused = null; } refreshBar(true); }, 300);
         }
         break;
       case "back": case "start":
@@ -1219,6 +1277,13 @@
     if (isPlayer()) {
       const popup = playerPopup();
       if (popup) return menuAction(action, popup);
+      if (menuMode) {
+        // Netflix hid the menu we were in. B just leaves; anything else brings it back first.
+        if (action === "back" || action === "start") { menuMode = null; clearInterval(menuKeepAlive); focused = null; refreshBar(true); return; }
+        const kind = menuMode;
+        reopenMenu(kind).then((p) => { if (p) menuAction(action, p); else { menuMode = null; toast(`${MENU_NAMES[kind]} menu closed`); } });
+        return;
+      }
       switch (action) {
         case "confirm": case "start": return togglePlay();
         case "left": return seek(-settings.seekSmall);
@@ -1298,7 +1363,7 @@
       lastCtx = ctx;
       if (ctx === "modal") modalOpenedAt = performance.now();
       if (ctx !== "browse") clearTvFocus();
-      if (ctx !== "player") clearInterval(menuKeepAlive);
+      if (ctx !== "player") { clearInterval(menuKeepAlive); menuMode = null; }
       if (controllerActive) {
         refreshBar(true);
         if (transitioning || isPlayer()) return;
