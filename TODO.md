@@ -4,7 +4,7 @@
 
 - **Version:** 1.2.0 (adds controls bar with button icons). 1.1.0 (TV mode) is waiting for Mozilla approval
 - **Tested on:** a mock Netflix page with a simulated controller (menus, row paging, details, My List, search keyboard, player controls, TV mode, controls bar, help screen icons)
-- **Not yet tested on:** real netflix.com
+- **Tested on real netflix.com (2026-10-12, new "Hawkins" UI):** home rows, row paging, title details open/close, search keyboard, focus memory, back navigation. Player **not** testable in the test browser (DRM error M7701-1003) – needs checking in Firefox
 
 ---
 
@@ -17,20 +17,28 @@
 - [ ] Remove the temporary copy from `about:debugging` once the signed version is installed
 
 ### Real-world testing on netflix.com
-- [ ] Profile picker: highlight lands on a profile and A selects it
-- [ ] Home page: rows, moving up/down, LB/RB row scrolling, arrows at the end of rows
-- [ ] Title details: opening with A, closing with B, focus returns to the card, Y = My List
-- [ ] Search: X opens the search box, on-screen keyboard typing updates results
+- [ ] Profile picker: highlight lands on a profile and A selects it (not reached in testing – session already had a profile)
+- [x] Home page: rows, moving up/down, LB/RB row scrolling, arrows at the end of rows
+- [x] Title details: opening with A, closing with B, focus returns to the card
+- [ ] Y = My List in title details (button found: `add-to-my-list` / `add-to-my-list-added`; not pressed in testing)
+- [x] Search: X opens the search box, on-screen keyboard typing updates results
 - [ ] Player: play/pause, seek, volume, mute through Netflix's player API (no playback errors)
 - [ ] Player: Y skips intro/recap, RT goes to the next episode, B exits
 - [ ] Fullscreen with View/Select. If Firefox blocks it, decide whether to keep the F11 message
 - [ ] Hover previews: check that the mouse resting on a card doesn't confuse the highlight
 
+### Netflix UI notes (Oct 2026)
+- Rows: `[data-uia^="carousel-row-section"]`, cards: `[data-uia="standard-card"]` / `progress-card` (links `/browse?jbv=ID`), arrows: `carousel-hawkins-left/right-button` (left is opacity 0 until hover), slide ~0.8s
+- Billboard: `play-video-button`, `billboard-more-info`
+- Title details: `[role=dialog]` `modal-motion-container-DETAIL_MODAL`; Play `play-button` (a plain `<button>` nested inside), close `previewModal-closebtn` (span; fade ~2s), My List `add-to-my-list(-added)`
+- Search: nav input `navigation+actions+search+input` always present; typing navigates to `/search?q=`
+- No `falcorCache` any more: synopsis / year / rating for the info panel are not available on the page (title comes from `aria-label`)
+
 ### TV mode on netflix.com
-- [ ] Focused card lifts with the right boxart image and lines up with the card underneath
+- [x] Focused card lifts with the right boxart image and lines up with the card underneath
 - [ ] Other cards in the row dim; nothing stays dimmed after leaving the row
-- [ ] Info panel shows row name and title; check whether year, rating and synopsis appear (they come from Netflix's page data cache and may be missing)
-- [ ] If synopsis is missing, find where Netflix keeps it now, or load it when a title is focused
+- [x] Info panel shows row name and title (year, rating and synopsis are not available on the new UI)
+- [ ] Synopsis is missing on the new UI: look at Netflix's GraphQL/`reactContext` data, or fetch title metadata when a card is focused
 - [ ] Focused row stays at the same height when moving up and down; first and last rows behave sensibly
 - [ ] Info panel doesn't cover anything important (adjust position or row height if it does)
 - [ ] Netflix hover pop-ups never appear while using the controller; moving the mouse restores normal behaviour
@@ -49,12 +57,12 @@
 - [ ] Pressed button icon flashes on each press
 
 ### Back navigation on netflix.com (v1.2.0 rework)
-- [ ] B on title details closes it and the highlight returns to the same card, not the top of the page
+- [x] B on title details closes it and the highlight returns to the same card, not the top of the page
 - [ ] B from a genre / My List / search page goes back and lands on the card you came from
 - [ ] B from the player returns to the card you launched from
-- [ ] Pressing B twice quickly never goes back two steps
-- [ ] Opening a title lands on its Play button straight away
-- [ ] Row scrolling with LB/RB/edge follows the animation (no early or late focus)
+- [x] Pressing B twice quickly never goes back two steps
+- [x] Opening a title lands on its Play button straight away
+- [x] Row scrolling with LB/RB/edge follows the animation (no early or late focus)
 
 ### Fixes likely after testing
 - [ ] Update any Netflix element selectors (`data-uia=...`) that don't match the current site
@@ -96,6 +104,7 @@
 - [x] On-screen keyboard for search
 - [x] Settings page with live controller test and button-remap wizard
 - [x] TV mode: lifted focus card, row dimming, title info panel, fixed focus row, no hover pop-ups, larger UI; L3 toggle and settings checkbox
+- [x] Ported to Netflix's new UI (carousel-row-section / standard-card / hawkins arrows / nav search input) and verified on the live site
 - [x] Back navigation rework: waits for the modal/page to actually change instead of fixed delays, per-page focus memory (kept across reloads) so B returns to the exact card, double-press guard, row paging waits for the slide to settle
 - [x] Controls bar: console-style button prompts that follow context, auto-detected Xbox / PlayStation / Nintendo / generic icons, press animation, auto-hide in player
 - [x] Hand-drawn SVG button icon set (`glyphs.js`), also used on the help screen and settings preview

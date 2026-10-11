@@ -94,7 +94,7 @@
     if (isHandle(el)) return "More";
     if (el.closest('.profile-link, [data-uia="profile-link"]')) return "Choose";
     if (/play/i.test(el.getAttribute("data-uia") || "") || /^play$/i.test(el.textContent.trim())) return "Play";
-    if (el.closest(".title-card, .slider-item") || cardImage(el)) return "Open";
+    if (el.closest(CARD_SEL) || cardImage(el)) return "Open";
     return "Select";
   }
 
@@ -135,7 +135,7 @@
     if (path !== "/browse" && path !== "") items.push(["back", "Back"]);
     items.push(["x", "Search"]);
     const row = focused && focused.isConnected && rowOf(focused);
-    if (row && row.querySelector(".handleNext, .handlePrev")) items.push(["lb+rb", "Scroll row"]);
+    if (row && row.querySelector(HANDLE_SEL.left + ", " + HANDLE_SEL.right)) items.push(["lb+rb", "Scroll row"]);
     items.push(["start", "Help"]);
     return items;
   }
@@ -247,7 +247,14 @@
     '[tabindex]:not([tabindex="-1"])',
   ].join(",");
 
-  const isHandle = (el) => /\bhandle(Next|Prev)\b/.test(el.className || "");
+  const ROW_SEL = '.lolomoRow, .rowContainer, .slider, [data-list-context], [data-uia^="carousel-row-section"]';
+  const CARD_SEL = '.slider-item, .title-card, [data-uia="standard-card"], [data-uia="progress-card"]';
+  const HANDLE_SEL = {
+    right: '.handleNext, [data-uia="carousel-hawkins-right-button"]',
+    left: '.handlePrev, [data-uia="carousel-hawkins-left-button"]',
+  };
+  const isHandle = (el) => /\bhandle(Next|Prev)\b/.test(el.className || "") ||
+    /^carousel-hawkins-(left|right)-button$/.test(el.getAttribute("data-uia") || "");
 
   function isUsable(el) {
     if (el.closest("#nfc-root")) return false;
@@ -271,17 +278,22 @@
   function getCandidates() {
     const scope = getModal() || document;
     const all = Array.from(scope.querySelectorAll(FOCUSABLE)).filter(isUsable);
-    // Keep the innermost focusable element when they are nested
-    // (e.g. a tabindex wrapper around a link).
+    // Nested focusables are one control. Keep the outer one when the inner
+    // fills it (Netflix puts a plain <button> inside its play-button link);
+    // otherwise keep the inner (a tabindex wrapper around a small link).
     const set = new Set(all);
-    const hasInner = new Set();
+    const drop = new Set();
+    const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
     for (const el of all) {
       let p = el.parentElement;
       for (let d = 0; p && d < 25; d++, p = p.parentElement) {
-        if (set.has(p)) hasInner.add(p);
+        if (!set.has(p)) continue;
+        if (area(el) >= area(p) * 0.8) drop.add(el);
+        else drop.add(p);
+        break;
       }
     }
-    return all.filter((el) => !hasInner.has(el));
+    return all.filter((el) => !drop.has(el));
   }
 
   let focused = null;
@@ -305,14 +317,15 @@
   }
 
   // Resolves once whatever `getRect` measures has stopped moving (carousel animations).
-  async function waitSettled(getRect, { timeout = 900 } = {}) {
+  async function waitSettled(getRect, { timeout = 900, moveTimeout = 200 } = {}) {
     const t0 = performance.now();
     const key = () => {
       const r = getRect();
       return r ? `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}` : "";
     };
     const start = key();
-    await waitFor(() => (key() !== start || performance.now() - t0 > 200) || null, { timeout: 220, interval: 16 });
+    // Netflix starts its carousel slide a few hundred ms after the click.
+    await waitFor(() => (key() !== start || performance.now() - t0 > moveTimeout) || null, { timeout: moveTimeout + 20, interval: 16 });
     let last = key(), stable = 0;
     while (performance.now() - t0 < timeout) {
       await new Promise(requestAnimationFrame);
@@ -338,7 +351,7 @@
     if (!el) return "";
     const a = el.matches("a[href]") ? el : el.querySelector("a[href]");
     const href = a && a.getAttribute("href");
-    if (href) return "href:" + href.split("?")[0];
+    if (href) return "href:" + href.replace(/[?&](tctx|trackId|trkid)=[^&]*/g, "").replace(/\?$/, "");
     const uia = el.getAttribute("data-uia");
     if (uia) return "uia:" + uia;
     const label = el.getAttribute("aria-label");
@@ -367,7 +380,8 @@
   function pickInitial(cands) {
     const preferred = [
       '[data-uia="profile-link"]', ".profile-link",
-      '[data-uia="play-button"]', '[data-uia="billboard-play"]',
+      '[data-uia="play-button"]', '[data-uia="billboard-play"]', '[data-uia="play-video-button"]',
+      '[data-uia="standard-card"]', '[data-uia="progress-card"]',
       ".title-card a", ".title-card-container a", ".slider-item a",
     ];
     for (const sel of preferred) {
@@ -423,7 +437,7 @@
     rememberFocus(el);
     const isCard = updateTvFocus(el);
     if (!scroll) return;
-    const row = isCard && el.closest(".lolomoRow, .rowContainer, .slider");
+    const row = isCard && rowOf(el);
     if (row) {
       // TV mode: the focused row always sits at the same height on screen.
       const delta = row.getBoundingClientRect().top - innerHeight * TV_ROW_Y;
@@ -464,8 +478,8 @@
 
   function videoId(el) {
     const a = el.matches("a[href]") ? el : el.querySelector("a[href]");
-    const m = a && a.getAttribute("href").match(/\/(?:watch|title)\/(\d+)/);
-    return m ? m[1] : null;
+    const m = a && a.getAttribute("href").match(/\/(?:watch|title)\/(\d+)|[?&]jbv=(\d+)/);
+    return m ? (m[1] || m[2]) : null;
   }
 
   // Netflix keeps title metadata in a page-side cache; use whatever is there.
@@ -496,7 +510,7 @@
       infoEl.hidden = true;
       return false;
     }
-    curItem = el.closest(".slider-item");
+    curItem = el.closest(".slider-item") || (el.matches('[data-uia="standard-card"], [data-uia="progress-card"]') ? el : null);
     dimRow = curItem && rowOf(curItem.parentElement);
     if (dimRow) {
       dimRow.classList.add("nfc-tv-dim");
@@ -505,7 +519,7 @@
     liftImg.src = img.currentSrc;
 
     const meta = videoMeta(videoId(el));
-    const rowEl = el.closest(".lolomoRow, .rowContainer");
+    const rowEl = rowOf(el);
     const rowTitle = rowEl && rowEl.querySelector(".row-header-title, .rowTitle, h2, h3");
     const set = (sel, text) => {
       const node = infoEl.querySelector(sel);
@@ -539,21 +553,24 @@
   }
 
   function rowOf(el) {
-    return el && el.closest(".lolomoRow, .rowContainer, .slider, [data-list-context]");
+    return el && el.closest(ROW_SEL);
   }
 
   function pageRow(dir, origin) {
     const row = rowOf(origin || focused);
-    const handle = row && row.querySelector(dir === "right" ? ".handleNext" : ".handlePrev");
+    const handle = row && row.querySelector(HANDLE_SEL[dir]);
     if (!handle) return false;
     const hr = (origin || handle).getBoundingClientRect();
     const prev = focused;
     handle.click();
     const probe = () => {
-      const c = row.querySelector(".slider-item, .title-card");
+      const c = row.querySelector(CARD_SEL);
       return c && c.getBoundingClientRect();
     };
-    waitSettled(probe).then(() => {
+    const startLeft = (probe() || {}).left;
+    waitSettled(probe, { timeout: 1800, moveTimeout: 700 }).then(() => {
+      // Nothing slid (already at the end, or the click was ignored): stay put.
+      if ((probe() || {}).left === startLeft) return;
       const inRow = getCandidates().filter((c) => {
         if (isHandle(c)) return false;
         const r = c.getBoundingClientRect();
@@ -658,20 +675,38 @@
     }
   }
 
+  let modalOpenedAt = 0;
+
   async function closeModal() {
     const modal = getModal();
     if (!modal) return false;
+    // Netflix ignores the close button while the dialog is still animating in.
+    const sinceOpen = performance.now() - modalOpenedAt;
+    if (sinceOpen < 900) await sleep(900 - sinceOpen);
+    const hadJbv = /[?&]jbv=/.test(location.search);
+    const stillOpen = () => getModal() === modal || (modal.isConnected && getComputedStyle(modal).opacity > 0.9);
     closingModal = modal;
-    const btn = modal.querySelector(
-      '[data-uia="previewModal-closebtn"], .previewModal-close, [aria-label="close" i], [aria-label="Close" i], [data-uia*="close"]'
-    );
-    if (btn) btn.click();
-    else pressKey("Escape", "Escape", 27, modal);
     focused = null;
     clearTvFocus();
-    await waitFor(() => !getModal() || null, { timeout: 1200 });
-    closingModal = null;
-    await restoreFocus();
+    // In priority order: a selector list would return a wrapper div first, and
+    // clicking that does nothing.
+    const btn = ['[data-uia="previewModal-closebtn"]', '[data-uia*="close"]', '[aria-label="close" i]', ".previewModal-close"]
+      .map((sel) => modal.querySelector(sel)).find(Boolean);
+    if (btn) btn.click();
+    else pressKey("Escape", "Escape", 27, modal);
+    // The page behind is already visible while the dialog fades, so put the
+    // highlight back straight away rather than after the ~2s fade.
+    const restored = restoreFocus();
+    waitFor(() => !stillOpen() || null, { timeout: 1500 }).then(async (closed) => {
+      if (!closed) {
+        pressKey("Escape", "Escape", 27, document.body);
+        closed = await waitFor(() => !stillOpen() || null, { timeout: 800 });
+      }
+      if (!closed && hadJbv && /[?&]jbv=/.test(location.search)) history.back();
+      await waitFor(() => !modal.isConnected || null, { timeout: 3000 });
+      closingModal = null;
+    });
+    await restored;
     return true;
   }
 
@@ -702,7 +737,7 @@
     let input = findSearchInput();
     if (!input) {
       const launcher = document.querySelector(
-        '[data-uia="search-box-launcher"], .searchTab, button[aria-label*="search" i]'
+        '[data-uia="search-box-launcher"], [data-uia="navigation+actions+search+icon"], .searchTab, button[aria-label*="search" i]'
       );
       if (launcher) {
         launcher.click();
@@ -719,7 +754,7 @@
 
   function findSearchInput() {
     const el = document.querySelector(
-      '[data-uia="search-box-input"], input[name="searchInput"], input[type="search"], #searchInput'
+      '[data-uia="search-box-input"], [data-uia="navigation+actions+search+input"], input[name="searchInput"], input[name="search"], input[type="search"], #searchInput'
     );
     return el && isUsable(el) ? el : null;
   }
@@ -912,9 +947,10 @@
 
   function setInputValue(input, value) {
     input.focus({ preventScroll: true });
-    // Through Firefox's Xray wrapper this hits the native setter, so React's
-    // value tracker sees a change and fires onChange for the input event.
-    input.value = value;
+    // Use the native setter so React's value tracker sees the change and
+    // fires onChange for the input event (Netflix's search is a React input).
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setter.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }
@@ -1067,6 +1103,7 @@
       const urlChanged = location.href !== lastUrl;
       lastUrl = location.href;
       lastCtx = ctx;
+      if (ctx === "modal") modalOpenedAt = performance.now();
       if (ctx !== "browse") clearTvFocus();
       if (controllerActive) {
         refreshBar(true);

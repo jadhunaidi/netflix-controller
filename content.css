@@ -124,8 +124,12 @@ html:not(.nfc-active) .nfc-info { display: none !important; }
 .nfc-lift img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 /* Dim the other cards in the focused row. */
-html.nfc-tv.nfc-active .nfc-tv-dim .slider-item { transition: opacity 160ms; }
-html.nfc-tv.nfc-active .nfc-tv-dim .slider-item:not(.nfc-tv-cur) { opacity: .45; }
+html.nfc-tv.nfc-active .nfc-tv-dim .slider-item,
+html.nfc-tv.nfc-active .nfc-tv-dim [data-uia="standard-card"],
+html.nfc-tv.nfc-active .nfc-tv-dim [data-uia="progress-card"] { transition: opacity 160ms; }
+html.nfc-tv.nfc-active .nfc-tv-dim .slider-item:not(.nfc-tv-cur),
+html.nfc-tv.nfc-active .nfc-tv-dim [data-uia="standard-card"]:not(.nfc-tv-cur),
+html.nfc-tv.nfc-active .nfc-tv-dim [data-uia="progress-card"]:not(.nfc-tv-cur) { opacity: .45; }
 
 /* No hover pop-ups: the page ignores the (hidden) mouse until it moves again. */
 html.nfc-tv.nfc-active body { pointer-events: none !important; }
