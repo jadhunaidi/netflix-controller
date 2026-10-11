@@ -23,7 +23,9 @@
 - [ ] Y = My List in title details (button found: `add-to-my-list` / `add-to-my-list-added`; not pressed in testing)
 - [x] Search: X opens the search box, on-screen keyboard typing updates results
 - [ ] Player: play/pause, seek, volume, mute through Netflix's player API (no playback errors)
-- [ ] Player: Y skips intro/recap, RT goes to the next episode, B exits
+- [ ] Player: Y skips intro/recap, B exits
+- [ ] Player controls mode: Up shows Netflix's bar, D-pad moves across buttons, A opens speed / subtitles / episodes menus and the D-pad works inside them, B closes a menu or returns to the video, bar stays visible while in controls mode, volume slider appears when the volume button is highlighted
+- [ ] Title details in Firefox: dialog is detected (lifted card and info panel disappear, Play is highlighted) – was broken before v1.2.0 fix
 - [ ] Fullscreen with View/Select. If Firefox blocks it, decide whether to keep the F11 message
 - [ ] Hover previews: check that the mouse resting on a card doesn't confuse the highlight
 

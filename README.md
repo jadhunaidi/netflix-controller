@@ -37,12 +37,12 @@ Bump `"version"` in `manifest.json` before signing a new build; Mozilla won't si
 | D-pad / left stick | Move | A / Start | Play / pause |
 | A | Select | Left / Right | Seek |
 | B | Back / close | LB / RB | Seek (long) |
-| X | Search | Up / Down | Volume |
-| Y | My List / jump to top | X | Mute |
-| LB / RB | Scroll row | Y | Skip intro / recap |
-| LT / RT | Page up / down | RT | Next episode |
+| X | Search | Up | Netflix control bar: D-pad across play, seek, volume, subtitles, speed, episodes, next, fullscreen; A opens menus |
+| Y | My List / jump to top | Down · LT / RT | Volume |
+| LB / RB | Scroll row | X | Mute |
+| LT / RT | Page up / down | Y | Skip intro / recap |
 | Right stick | Scroll page | View | Fullscreen |
-| View | Home | B | Exit player |
+| View | Home | B | Exit player (or close menu / back to video in controls mode) |
 | Start | Help | | |
 | L3 (press left stick) | TV mode on / off | | |
 

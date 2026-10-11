@@ -114,10 +114,15 @@
       return [["dpad", "Move"], ["confirm", "Type"], ["back", osk.text ? "Delete" : "Close"], ["x", "Space"], ["start", "Done"]];
     }
     if (isPlayer()) {
-      const items = [["confirm", playerPaused() ? "Play" : "Pause"], ["dpad-h", "Seek"], ["dpad-v", "Volume"]];
+      if (ctrlMode) {
+        const label = focused && focused.isConnected && (focused.getAttribute("aria-label") || focused.textContent.trim());
+        const items = [["dpad", "Move"], ["confirm", label ? label.slice(0, 22) : "Select"]];
+        items.push(["back", playerPopup() ? "Close menu" : "Back to video"]);
+        return items;
+      }
+      const items = [["confirm", playerPaused() ? "Play" : "Pause"], ["dpad-h", "Seek"], ["dpad-v", "Controls / Vol−"]];
       const skip = findSkipButton();
       if (skip) items.push(["y", (skip.textContent.trim() || "Skip").slice(0, 24)]);
-      if (document.querySelector('[data-uia^="next-episode-seamless-button"]')) items.push(["rt", "Next episode"]);
       items.push(["back", "Exit"]);
       return items;
     }
@@ -204,15 +209,28 @@
   const isPlayer = () => location.pathname.startsWith("/watch");
   let closingModal = null; // a dialog that is fading out after B was pressed
 
+  const bigEnough = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > innerWidth * 0.4 && r.height > 150;
+  };
+
   function getModal() {
     const list = document.querySelectorAll(
-      '[aria-modal="true"], [role="dialog"], .previewModal--container.detail-modal'
+      '[aria-modal="true"], [role="dialog"], [data-uia^="modal-motion-container"], .previewModal--container.detail-modal, .detail-modal'
     );
     for (let i = list.length - 1; i >= 0; i--) {
       const d = list[i];
       if (d.closest("#nfc-root") || d === closingModal) continue;
-      const r = d.getBoundingClientRect();
-      if (r.width > innerWidth * 0.4 && r.height > 150) return d;
+      if (bigEnough(d)) return d;
+    }
+    // Title details are open whenever ?jbv= is in the URL; if none of the
+    // markers above matched, walk up from the close button to the dialog box.
+    if (/[?&]jbv=/.test(location.search)) {
+      const close = document.querySelector('[data-uia="previewModal-closebtn"]');
+      for (let el = close && close.parentElement; el && el !== document.body; el = el.parentElement) {
+        if (el === closingModal) return null;
+        if (bigEnough(el)) return el;
+      }
     }
     return null;
   }
@@ -379,6 +397,7 @@
 
   function pickInitial(cands) {
     const preferred = [
+      '[data-uia^="control-play-pause"]', '[data-uia="player-play-pause"]',
       '[data-uia="profile-link"]', ".profile-link",
       '[data-uia="play-button"]', '[data-uia="billboard-play"]', '[data-uia="play-video-button"]',
       '[data-uia="standard-card"]', '[data-uia="progress-card"]',
@@ -628,7 +647,7 @@
 
   // Ring follows the focused element every frame (cards animate/resize).
   function updateRing() {
-    const r = !isPlayer() && controllerActive && focused && focused.isConnected
+    const r = (!isPlayer() || ctrlMode) && controllerActive && focused && focused.isConnected
       ? focused.getBoundingClientRect() : null;
     if (r && r.width > 0) {
       let box = r;
@@ -867,6 +886,56 @@
     }));
   }
 
+  // ----------------------------------------------- player controls mode ----
+  // Up while watching brings up Netflix's own control bar; the D-pad then
+  // moves across its buttons and into the speed / subtitles / episodes menus.
+
+  let ctrlMode = false, ctrlKeepAlive = 0;
+
+  // A pop-up menu opened from the control bar (speed, audio & subtitles, episodes).
+  function playerPopup() {
+    const sel = '[role="menu"], [role="listbox"], [role="dialog"], [data-uia*="popup"], [data-uia*="menu"], [data-uia*="selector"], [data-uia="audio-subtitle-controls"], [data-uia*="playback-speed"], [data-uia*="episodes"]';
+    return Array.from(document.querySelectorAll(sel)).reverse().find((el) => {
+      if (el.closest("#nfc-root") || el.matches("button, [data-uia^='control-']")) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 120 && r.height > 80 && r.width * r.height < innerWidth * innerHeight * 0.7;
+    }) || null;
+  }
+
+  // Pretend the mouse is resting on the highlighted control, so hover-only
+  // things (volume slider, tooltips) appear as they would for a mouse user.
+  function hoverFocused() {
+    const el = focused;
+    if (!el || !el.isConnected) return;
+    const r = el.getBoundingClientRect();
+    const init = { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    for (const type of ["pointerover", "pointerenter", "mouseover", "mouseenter", "pointermove", "mousemove"]) {
+      el.dispatchEvent(type.startsWith("pointer") ? new PointerEvent(type, init) : new MouseEvent(type, init));
+    }
+  }
+
+  function enterCtrlMode() {
+    ctrlMode = true;
+    revealControls();
+    clearInterval(ctrlKeepAlive);
+    // Netflix hides the bar after a few idle seconds; keep nudging it.
+    ctrlKeepAlive = setInterval(() => { revealControls(); hoverFocused(); }, 1500);
+    waitFor(() => { const c = getCandidates(); return c.length ? c : null; }, { timeout: 1500 }).then((cands) => {
+      if (!ctrlMode || !cands) return;
+      setFocus(pickInitial(cands), { scroll: false });
+      hoverFocused();
+      refreshBar(true);
+    });
+    toast("Controls – D-pad to move, A to select, B to go back", 1800);
+  }
+
+  function exitCtrlMode() {
+    ctrlMode = false;
+    clearInterval(ctrlKeepAlive);
+    focused = null;
+    refreshBar(true);
+  }
+
   const SKIP_SELECTOR = [
     '[data-uia="player-skip-intro"]', '[data-uia="player-skip-recap"]',
     '[data-uia="player-skip-preplay"]', '[data-uia="next-episode-seamless-button"]',
@@ -1016,8 +1085,9 @@
       ],
       watching: [
         ["confirm+start", "Play / pause"], ["dpad-h", `Seek ±${settings.seekSmall}s`],
-        ["lb+rb", `Seek ±${settings.seekLarge}s`], ["dpad-v", "Volume"], ["x", "Mute"],
-        ["y", "Skip intro / recap"], ["rt", "Next episode"], ["select", "Fullscreen"], ["back", "Exit player"],
+        ["lb+rb", `Seek ±${settings.seekLarge}s`], ["dpad-v", "Up: control bar (speed, subtitles, episodes…) · Down: volume −"],
+        ["lt+rt", "Volume − / +"], ["x", "Mute"],
+        ["y", "Skip intro / recap"], ["select", "Fullscreen"], ["back", "Exit player / back to video"],
       ],
     };
     for (const [key, rows] of Object.entries(HELP)) {
@@ -1047,17 +1117,47 @@
     if (action === "l3") return toggleTvMode();
 
     if (isPlayer()) {
+      if (ctrlMode) {
+        // Moving around Netflix's own control bar and its pop-up menus.
+        switch (action) {
+          case "left": case "right": case "up": return navigate(action);
+          case "down": {
+            // Down off the bottom row of controls = back to the video.
+            const cands = getCandidates().filter((c) => c !== focused);
+            const next = focused && findBest(focused.getBoundingClientRect(), cands, "down");
+            if (next) return setFocus(next, { scroll: false });
+            return exitCtrlMode();
+          }
+          case "confirm":
+            if (!focused || !focused.isConnected) return setFocus(pickInitial(getCandidates()), { scroll: false });
+            clickEl(focused);
+            // Menus (speed, subtitles, episodes) open on click: move into them.
+            setTimeout(() => { const p = playerPopup(); if (p) { const c = getCandidates().filter((el) => p.contains(el)); if (c.length) setFocus(pickInitial(c), { scroll: false }); } hoverFocused(); }, 250);
+            return;
+          case "back": {
+            if (playerPopup()) { pressKey("Escape", "Escape", 27, document.body); setTimeout(() => { if (playerPopup()) exitCtrlMode(); else hoverFocused(); }, 200); return; }
+            return exitCtrlMode();
+          }
+          case "start": return exitCtrlMode();
+          case "x": return toggleMute();
+          case "lt": return changeVolume(-settings.volumeStep);
+          case "rt": return changeVolume(settings.volumeStep);
+          case "select": return toggleFullscreen();
+        }
+        return;
+      }
       switch (action) {
         case "confirm": case "start": return togglePlay();
         case "left": return seek(-settings.seekSmall);
         case "right": return seek(settings.seekSmall);
         case "lb": return seek(-settings.seekLarge);
         case "rb": return seek(settings.seekLarge);
-        case "up": return changeVolume(settings.volumeStep);
+        case "up": return enterCtrlMode();
         case "down": return changeVolume(-settings.volumeStep);
+        case "lt": return changeVolume(-settings.volumeStep);
+        case "rt": return changeVolume(settings.volumeStep);
         case "x": return toggleMute();
         case "y": return clickSkip();
-        case "rt": return nextEpisode();
         case "select": return toggleFullscreen();
         case "back": return exitPlayer();
       }
@@ -1105,6 +1205,7 @@
       lastCtx = ctx;
       if (ctx === "modal") modalOpenedAt = performance.now();
       if (ctx !== "browse") clearTvFocus();
+      if (ctx !== "player" && ctrlMode) exitCtrlMode();
       if (controllerActive) {
         refreshBar(true);
         if (transitioning || isPlayer()) return;
