@@ -38,31 +38,28 @@ html.nfc-tv .nfc-ring {
 .nfc-bar {
   position: fixed; left: 0; right: 0; bottom: 0;
   display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;
-  gap: calc(10px * var(--s)) calc(30px * var(--s));
-  padding: calc(46px * var(--s)) 4vw calc(22px * var(--s));
-  background: linear-gradient(to top, rgba(0, 0, 0, .86) 0%, rgba(0, 0, 0, .55) 55%, rgba(0, 0, 0, 0) 100%);
-  font-size: calc(17px * var(--s));
+  gap: calc(10px * var(--s)) calc(26px * var(--s));
+  padding: calc(40px * var(--s)) 4vw calc(20px * var(--s));
+  background: linear-gradient(to top, rgba(0, 0, 0, .82) 0%, rgba(0, 0, 0, .5) 55%, rgba(0, 0, 0, 0) 100%);
+  font-size: calc(15px * var(--s));
   transition: opacity 260ms ease, transform 260ms ease;
 }
 .nfc-bar.nfc-hide, html:not(.nfc-active) .nfc-bar { opacity: 0; transform: translateY(14px); }
-.nfc-bar-item { display: flex; align-items: center; gap: calc(10px * var(--s)); }
+.nfc-bar-item { display: flex; align-items: center; gap: calc(8px * var(--s)); }
 .nfc-bar-label {
-  color: #fff; font-weight: 500; letter-spacing: .2px; white-space: nowrap;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
+  color: #e8e8e8; font-weight: 500; letter-spacing: .2px; white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
 }
 
-/* Button glyphs (SVG from glyphs.js) */
+/* Button glyphs (SVG from glyphs.js): flat, monochrome, lettering stamped out */
 .nfc-glyph-wrap {
-  display: inline-flex; transition: transform 90ms ease-out, filter 90ms ease-out;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+  display: inline-flex; color: #f2f2f2;
+  transition: transform 90ms ease-out, opacity 90ms ease-out;
 }
-.nfc-glyph-wrap + .nfc-glyph-wrap { margin-left: calc(4px * var(--s)); }
-.nfc-glyph { display: block; width: calc(34px * var(--s)); height: calc(34px * var(--s)); }
-.nfc-glyph.nfc-wide { width: calc(46.75px * var(--s)); }
-.nfc-glyph-wrap.nfc-pressed {
-  transform: scale(.84);
-  filter: brightness(1.45) drop-shadow(0 0 8px rgba(255, 255, 255, .55));
-}
+.nfc-glyph-wrap + .nfc-glyph-wrap { margin-left: calc(3px * var(--s)); }
+.nfc-glyph { display: block; width: calc(24px * var(--s)); height: calc(24px * var(--s)); }
+.nfc-glyph.nfc-wide { width: calc(33px * var(--s)); }
+.nfc-glyph-wrap.nfc-pressed { transform: scale(.86); opacity: .55; }
 
 /* Help overlay */
 .nfc-help {
@@ -80,8 +77,8 @@ html.nfc-tv .nfc-ring {
 .nfc-help-card dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: calc(15px * var(--s)); }
 .nfc-help-card dt { display: flex; align-items: center; justify-content: flex-end; }
 .nfc-help-card dd { align-self: center; }
-.nfc-help-card .nfc-glyph { width: calc(30px * var(--s)); height: calc(30px * var(--s)); }
-.nfc-help-card .nfc-glyph.nfc-wide { width: calc(41.25px * var(--s)); }
+.nfc-help-card .nfc-glyph { width: calc(22px * var(--s)); height: calc(22px * var(--s)); }
+.nfc-help-card .nfc-glyph.nfc-wide { width: calc(30.25px * var(--s)); }
 .nfc-help-card dd { margin: 0; color: #bcbcbc; }
 .nfc-help-foot { margin: 22px 0 0; color: #bcbcbc; font-size: calc(15px * var(--s)); display: flex; gap: 10px; align-items: center; justify-content: center; }
 

@@ -50,8 +50,9 @@ select { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid
   background: linear-gradient(to top, #000, #1c1c1c); color: #fff; font-size: 14px;
 }
 .glyph-preview .item { display: flex; align-items: center; gap: 8px; }
-.glyph-preview .nfc-glyph { width: 30px; height: 30px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
-.glyph-preview .nfc-glyph.nfc-wide { width: 41.25px; }
+.glyph-preview .nfc-glyph { width: 24px; height: 24px; display: block; color: #f2f2f2; }
+.glyph-preview .nfc-glyph.nfc-wide { width: 33px; }
+.glyph-preview .item { color: #e8e8e8; }
 .saved { opacity: 0; transition: opacity 300ms; }
 .saved.show { opacity: 1; }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 32px; }

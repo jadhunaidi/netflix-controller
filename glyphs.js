@@ -1,6 +1,8 @@
 /*
- * Controller button glyphs as inline SVG, drawn from vector paths (no fonts)
- * so they stay crisp at any size. Styles: xbox, playstation, nintendo, generic.
+ * Controller button glyphs: flat, single-colour shapes with the lettering
+ * stamped out (an SVG mask makes the letters transparent, so the page shows
+ * through). Colour comes from CSS `currentColor`. Styles: xbox, playstation,
+ * nintendo, generic.
  *
  *   NFC.glyph(button, style) -> "<svg ...>"
  *   button: confirm | back | x | y | lb | rb | lt | rt | select | start |
@@ -15,12 +17,12 @@
   // Face buttons by physical position (W3C standard mapping).
   const FACE_POS = { confirm: "s", back: "e", x: "w", y: "n" };
 
-  // Geometric letters for face buttons, centred in a 64×64 box.
+  // Geometric letters, centred in a 64×64 box.
   const LETTER = {
-    A: "M22 45 L32 19 L42 45 M25.5 36 H38.5",
-    B: "M24 18.5 V45.5 H33.5 A6.75 6.75 0 0 0 33.5 32 H24 M24 32 H32.5 A6.75 6.75 0 0 0 32.5 18.5 H24",
-    X: "M23 19 L41 45 M41 19 L23 45",
-    Y: "M22.5 19 L32 32.5 L41.5 19 M32 32.5 V45",
+    A: "M22.5 44.5 L32 19.5 L41.5 44.5 M25.8 36 H38.2",
+    B: "M24.5 19 V45 H33.5 A6.5 6.5 0 0 0 33.5 32 H24.5 M24.5 32 H32.5 A6.5 6.5 0 0 0 32.5 19 H24.5",
+    X: "M23.5 19.5 L40.5 44.5 M40.5 19.5 L23.5 44.5",
+    Y: "M23 19.5 L32 32.5 L41 19.5 M32 32.5 V44.5",
   };
 
   // Small letters for shoulder/stick labels, in a 16-unit-tall cell: [path, width].
@@ -34,7 +36,10 @@
     2: ["M0.8 4.2 A4.3 4.2 0 1 1 8.2 7.4 L0.5 16 H9.5", 10],
   };
 
-  function smallLabel(text, cx, cy, scale, color) {
+  // Everything drawn inside a mask is a cut-out: black = transparent.
+  const cut = (w = 5) => `fill="none" stroke="#000" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`;
+
+  function smallLabel(text, cx, cy, scale) {
     const chars = text.split("").map((c) => SMALL[c]);
     const gap = 3;
     const w = chars.reduce((s, c) => s + c[1], 0) + gap * (chars.length - 1);
@@ -44,84 +49,60 @@
       x += cw + gap;
       return p;
     }).join("");
-    return `<g transform="translate(${cx - (w * scale) / 2} ${cy - (16 * scale) / 2}) scale(${scale})"
-      fill="none" stroke="${color}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">${paths}</g>`;
+    return `<g transform="translate(${cx - (w * scale) / 2} ${cy - (16 * scale) / 2}) scale(${scale})" ${cut(2.4 / scale)}>${paths}</g>`;
   }
 
   const svg = (body, wide) =>
     `<svg class="nfc-glyph${wide ? " nfc-wide" : ""}" viewBox="0 0 ${wide ? 88 : 64} 64" aria-hidden="true" focusable="false">${body}</svg>`;
 
-  function darkGradient(id) {
-    return `<radialGradient id="${id}" cx="50%" cy="28%" r="78%">
-      <stop offset="0" stop-color="#505056"/><stop offset=".55" stop-color="#29292e"/><stop offset="1" stop-color="#131316"/>
-    </radialGradient>`;
+  // A solid shape with `cutout` stamped out of it.
+  function stamped(shape, cutout, wide) {
+    const id = nextId();
+    return svg(`<mask id="${id}"><rect width="100%" height="100%" fill="#fff"/>${cutout}</mask>
+      <g fill="currentColor" mask="url(#${id})">${shape}</g>`, wide);
   }
 
-  // Round button body: shadow, gradient fill, rim and a soft top highlight.
-  function roundBase(rim, rimWidth = 2.2) {
-    const g = nextId();
-    return `<defs>${darkGradient(g)}</defs>
-      <circle cx="32" cy="33.5" r="29" fill="#000" opacity=".35"/>
-      <circle cx="32" cy="32" r="29" fill="url(#${g})"/>
-      <circle cx="32" cy="32" r="28" fill="none" stroke="${rim}" stroke-width="${rimWidth}"/>
-      <path d="M13 25 A20 20 0 0 1 51 25" fill="none" stroke="#fff" stroke-opacity=".11" stroke-width="5" stroke-linecap="round"/>`;
-  }
-
-  const stroke = (color, w = 4.6) =>
-    `fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`;
+  const DISC = `<circle cx="32" cy="32" r="27"/>`;
+  const RING = `<path fill-rule="evenodd" d="M32 5 A27 27 0 1 0 32 59 A27 27 0 1 0 32 5 Z M32 11.5 A20.5 20.5 0 1 1 32 52.5 A20.5 20.5 0 1 1 32 11.5 Z"/>`;
 
   // ---------------------------------------------------------- face buttons --
 
-  const XBOX_FACE = {
-    s: ["A", "#62c932"], e: ["B", "#ff5145"], w: ["X", "#3aa0ff"], n: ["Y", "#ffc624"],
-  };
+  const XBOX_FACE = { s: "A", e: "B", w: "X", n: "Y" };
   const NINTENDO_FACE = { s: "B", e: "A", w: "Y", n: "X" };
 
   function face(pos, style) {
     if (style === "playstation") {
-      const c = { s: "#93b9ff", e: "#ff7474", w: "#f6a6d8", n: "#62e2c0" }[pos];
       const shape = {
-        s: `<path d="M22.5 22.5 L41.5 41.5 M41.5 22.5 L22.5 41.5" ${stroke(c)}/>`,
-        e: `<circle cx="32" cy="32" r="11" ${stroke(c)}/>`,
-        w: `<rect x="21.5" y="21.5" width="21" height="21" rx="1.5" ${stroke(c)}/>`,
-        n: `<path d="M32 18.5 L44 39.5 H20 Z" ${stroke(c)}/>`,
+        s: `<path d="M22.5 22.5 L41.5 41.5 M41.5 22.5 L22.5 41.5" ${cut(5)}/>`,
+        e: `<circle cx="32" cy="32" r="10.5" ${cut(5)}/>`,
+        w: `<rect x="22" y="22" width="20" height="20" rx="1.5" ${cut(5)}/>`,
+        n: `<path d="M32 19.5 L43.5 39.5 H20.5 Z" ${cut(5)}/>`,
       }[pos];
-      return svg(roundBase("#5e5e66", 1.6) + shape);
-    }
-    if (style === "nintendo") {
-      return svg(roundBase("#6a6a72", 1.6) + `<path d="${LETTER[NINTENDO_FACE[pos]]}" ${stroke("#f2f2f2")}/>`);
+      return stamped(DISC, shape);
     }
     if (style === "generic") {
-      const dots = { n: [32, 17], e: [47, 32], s: [32, 47], w: [17, 32] };
-      const body = Object.entries(dots).map(([p, [x, y]]) => p === pos
-        ? `<circle cx="${x}" cy="${y}" r="7" fill="#fff"/>`
-        : `<circle cx="${x}" cy="${y}" r="5.8" fill="none" stroke="#8a8a92" stroke-width="2"/>`).join("");
-      return svg(roundBase("#5e5e66", 1.6) + body);
+      // Button position: the one that matters is a hole, the others faint dimples.
+      const dots = { n: [32, 18], e: [46, 32], s: [32, 46], w: [18, 32] };
+      const body = Object.entries(dots).map(([p, [x, y]]) =>
+        `<circle cx="${x}" cy="${y}" r="${p === pos ? 6.5 : 4}" fill="${p === pos ? "#000" : "#999"}"/>`).join("");
+      return stamped(DISC, body);
     }
-    const [letter, color] = XBOX_FACE[pos];
-    return svg(roundBase(color) + `<path d="${LETTER[letter]}" ${stroke(color)}/>`);
+    const letter = (style === "nintendo" ? NINTENDO_FACE : XBOX_FACE)[pos];
+    return stamped(DISC, `<path d="${LETTER[letter]}" ${cut(5.5)}/>`);
   }
 
   // ---------------------------------------------------------------- d-pad --
 
+  const CROSS = `<path d="M24 4 H40 Q42.5 4 42.5 6.5 V21.5 H57.5 Q60 21.5 60 24 V40 Q60 42.5 57.5 42.5 H42.5 V57.5 Q42.5 60 40 60 H24 Q21.5 60 21.5 57.5 V42.5 H6.5 Q4 42.5 4 40 V24 Q4 21.5 6.5 21.5 H21.5 V6.5 Q21.5 4 24 4 Z"/>`;
+
   function dpad(active) {
-    const g = nextId();
-    const arm = (on) => (on ? "#ffffff" : "#45454c");
-    return svg(`<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#47474d"/><stop offset="1" stop-color="#1b1b1f"/></linearGradient></defs>
-      <path transform="translate(0 1.6)" opacity=".35" fill="#000"
-        d="M24 5 H40 Q42 5 42 7 V22 H57 Q59 22 59 24 V40 Q59 42 57 42 H42 V57 Q42 59 40 59 H24 Q22 59 22 57 V42 H7 Q5 42 5 40 V24 Q5 22 7 22 H22 V7 Q22 5 24 5 Z"/>
-      <path fill="url(#${g})" stroke="#64646c" stroke-width="1.5"
-        d="M24 5 H40 Q42 5 42 7 V22 H57 Q59 22 59 24 V40 Q59 42 57 42 H42 V57 Q42 59 40 59 H24 Q22 59 22 57 V42 H7 Q5 42 5 40 V24 Q5 22 7 22 H22 V7 Q22 5 24 5 Z"/>
-      <circle cx="32" cy="32" r="5" fill="#000" opacity=".28"/>
-      ${active.up ? '<rect x="23" y="6" width="18" height="17" rx="1.5" fill="#fff" opacity=".13"/>' : ""}
-      ${active.down ? '<rect x="23" y="41" width="18" height="17" rx="1.5" fill="#fff" opacity=".13"/>' : ""}
-      ${active.left ? '<rect x="6" y="23" width="17" height="18" rx="1.5" fill="#fff" opacity=".13"/>' : ""}
-      ${active.right ? '<rect x="41" y="23" width="17" height="18" rx="1.5" fill="#fff" opacity=".13"/>' : ""}
-      <path d="M32 10 L37.5 17.5 H26.5 Z" fill="${arm(active.up)}"/>
-      <path d="M32 54 L26.5 46.5 H37.5 Z" fill="${arm(active.down)}"/>
-      <path d="M10 32 L17.5 26.5 V37.5 Z" fill="${arm(active.left)}"/>
-      <path d="M54 32 L46.5 37.5 V26.5 Z" fill="${arm(active.right)}"/>`);
+    // Active directions are stamped right through; inactive ones only dented.
+    const arm = (on) => (on ? "#000" : "#8a8a8a");
+    return stamped(CROSS, `
+      <path d="M32 9.5 L38 17.5 H26 Z" fill="${arm(active.up)}"/>
+      <path d="M32 54.5 L26 46.5 H38 Z" fill="${arm(active.down)}"/>
+      <path d="M9.5 32 L17.5 26 V38 Z" fill="${arm(active.left)}"/>
+      <path d="M54.5 32 L46.5 38 V26 Z" fill="${arm(active.right)}"/>`);
   }
 
   // ------------------------------------------------------------- shoulders --
@@ -134,65 +115,45 @@
   };
 
   function shoulder(btn, style) {
-    const g = nextId();
     const right = btn === "rb" || btn === "rt";
     const trigger = btn === "lt" || btn === "rt";
     const shape = trigger
-      ? "M15 55 V31 Q15 10 37 9 H51 Q73 10 73 31 V55 Q73 58 70 58 H18 Q15 58 15 55 Z"
-      : "M8 46 V31 Q8 18.5 22 17.5 L64 15 Q80 14.5 80 28 V46 Q80 50 76 50 H12 Q8 50 8 46 Z";
+      ? "M16 54 V30 Q16 11 36 10 H52 Q72 11 72 30 V54 Q72 57 69 57 H19 Q16 57 16 54 Z"
+      : "M9 45 V31 Q9 19.5 22.5 18.5 L63 16 Q79 15.5 79 28.5 V45 Q79 49 75 49 H13 Q9 49 9 45 Z";
     const mirror = right ? ` transform="translate(88 0) scale(-1 1)"` : "";
     const label = (SHOULDER_LABELS[style] || SHOULDER_LABELS.xbox)[btn];
-    return svg(`<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#55555c"/><stop offset=".5" stop-color="#2c2c31"/><stop offset="1" stop-color="#18181b"/></linearGradient></defs>
-      <g${mirror}>
-        <path d="${shape}" fill="#000" opacity=".35" transform="translate(0 1.6)"/>
-        <path d="${shape}" fill="url(#${g})" stroke="#66666e" stroke-width="1.5"/>
-        <path d="${trigger ? "M24 22 Q26 15 37 14.5 H51" : "M15 25 Q17 21.5 24 21 L62 19"}" fill="none" stroke="#fff" stroke-opacity=".13" stroke-width="3.5" stroke-linecap="round"/>
-      </g>
-      ${smallLabel(label, 44, trigger ? 35 : 33, 1.3, "#f2f2f2")}`, true);
+    return stamped(`<path d="${shape}"${mirror}/>`, smallLabel(label, 44, trigger ? 35 : 33, 1.25), true);
   }
 
   // ---------------------------------------------------------------- sticks --
 
   function stick(side, variant) {
-    const cap = nextId();
     const pressed = variant === "press";
     const chevrons = variant === "move"
-      ? `<path d="M26.5 10 L32 5 L37.5 10 M26.5 54 L32 59 L37.5 54" ${stroke("#ffffff", 2.6)}/>` : "";
-    return svg(`<defs><radialGradient id="${cap}" cx="45%" cy="35%" r="70%">
-        <stop offset="0" stop-color="${pressed ? "#7a7a82" : "#5c5c63"}"/><stop offset="1" stop-color="#232327"/></radialGradient></defs>
-      ${roundBase(pressed ? "#ffffff" : "#5e5e66", pressed ? 2.4 : 1.6)}
-      <circle cx="32" cy="33" r="18.5" fill="#000" opacity=".35"/>
-      <circle cx="32" cy="32" r="18" fill="url(#${cap})" stroke="#7b7b83" stroke-width="1.4"/>
-      <circle cx="32" cy="32" r="13.5" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1.2"/>
-      ${chevrons}
-      ${smallLabel(side === "l" ? "L" : "R", 32, 32, 1, "#f2f2f2")}`);
+      ? `<path d="M27 9.5 L32 4.5 L37 9.5 M27 54.5 L32 59.5 L37 54.5" ${cut(3)}/>` : "";
+    const shape = pressed ? DISC : RING + `<circle cx="32" cy="32" r="15"/>`;
+    return stamped(shape, smallLabel(side === "l" ? "L" : "R", 32, 32, 1.05) + chevrons);
   }
 
   // ------------------------------------------------------------ view / menu --
 
   function system(btn, style) {
     const isStart = btn === "start";
+    let icon;
     if (style === "nintendo") {
-      const icon = isStart ? "M23 32 H41 M32 23 V41" : "M23 32 H41";
-      return svg(roundBase("#6a6a72", 1.6) + `<path d="${icon}" ${stroke("#f2f2f2", 4)}/>`);
+      icon = `<path d="${isStart ? "M23 32 H41 M32 23 V41" : "M23 32 H41"}" ${cut(4.5)}/>`;
+    } else if (style === "playstation") {
+      icon = isStart
+        ? `<path d="M23 25.5 H41 M23 32 H41 M23 38.5 H41" ${cut(3.2)}/>`
+        : `<path d="M32 21.5 V35 M26.5 27 L32 21.5 L37.5 27 M23.5 32 V40.5 H40.5 V32" ${cut(3)}/>`;
+    } else {
+      // Xbox (and generic): View = two overlapping windows, Menu = three lines.
+      icon = isStart
+        ? `<path d="M21.5 24.5 H42.5 M21.5 32 H42.5 M21.5 39.5 H42.5" ${cut(3.4)}/>`
+        : `<rect x="18.5" y="27.5" width="17" height="13" rx="2" ${cut(3)}/>
+           <path d="M25 27.5 V24 Q25 21.5 27.5 21.5 H43 Q45.5 21.5 45.5 24 V33 Q45.5 35.5 43 35.5 H35.5" ${cut(3)}/>`;
     }
-    if (style === "playstation") {
-      const g = nextId();
-      const icon = isStart
-        ? `<path d="M23 25 H41 M23 32 H41 M23 39 H41" ${stroke("#f2f2f2", 3)}/>`
-        : `<path d="M32 21 V35 M26.5 26.5 L32 21 L37.5 26.5 M23.5 32 V40.5 H40.5 V32" ${stroke("#f2f2f2", 2.8)}/>`;
-      return svg(`<defs>${darkGradient(g)}</defs>
-        <rect x="11" y="15.5" width="42" height="35" rx="13" fill="#000" opacity=".35"/>
-        <rect x="11" y="14" width="42" height="35" rx="13" fill="url(#${g})" stroke="#64646c" stroke-width="1.5"/>
-        <g transform="translate(0 -0.5)">${icon}</g>`);
-    }
-    // Xbox (and generic): View = two overlapping windows, Menu = three lines.
-    const icon = isStart
-      ? `<path d="M21 24 H43 M21 32 H43 M21 40 H43" ${stroke("#f2f2f2", 3.2)}/>`
-      : `<rect x="18" y="27" width="18" height="14" rx="2.5" ${stroke("#f2f2f2", 2.8)}/>
-         <path d="M24.5 27 V23.5 Q24.5 21 27 21 H43.5 Q46 21 46 23.5 V32.5 Q46 35 43.5 35 H36" ${stroke("#f2f2f2", 2.8)}/>`;
-    return svg(roundBase("#5e5e66", 1.6) + icon);
+    return stamped(DISC, icon);
   }
 
   // ------------------------------------------------------------------ api --

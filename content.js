@@ -1213,8 +1213,19 @@
           // Title details: wait for its Play button rather than landing on the close X.
           const modal = getModal();
           focused = null;
-          waitFor(() => modal.querySelector('[data-uia="play-button"], [data-uia*="play"]'), { timeout: 900 })
-            .then(() => { if (getModal() === modal && !transitioning) setFocus(pickInitial(getCandidates())); });
+          const playBtn = () => {
+            const b = modal.querySelector('[data-uia="play-button"], [data-uia="billboard-play"], [data-uia="play-video-button"]');
+            return b && isUsable(b) ? b : null;
+          };
+          waitFor(playBtn, { timeout: 2500 }).then((btn) => {
+            if (getModal() !== modal || transitioning) return;
+            if (btn) {
+              setFocus(btn, { scroll: false });
+              if (!inViewport(btn.getBoundingClientRect())) btn.scrollIntoView({ block: "center", behavior: "smooth" });
+            } else {
+              setFocus(pickInitial(getCandidates()));
+            }
+          });
         } else if (urlChanged && !(focused && focused.isConnected && isUsable(focused))) {
           restoreFocus();
         }
