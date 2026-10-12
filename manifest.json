@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Netflix Controller Navigator",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Navigate Netflix menus and control playback with a gamepad (Xbox, 8BitDo, PlayStation or any generic controller).",
   "icons": {
     "48": "icons/icon.svg",

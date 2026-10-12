@@ -34,8 +34,15 @@
   function renderGlyphPreview() {
     const style = glyphSelect.value === "auto" ? NFC.detectGlyphStyle(NFC.getPads()[0]) : glyphSelect.value;
     const items = [["dpad", "Navigate"], ["confirm", "Select"], ["back", "Back"], ["x", "Search"], ["y", "My List"], ["lb+rb", "Scroll row"], ["start", "Help"]];
-    $("glyph-preview").innerHTML = items.map(([keys, label]) =>
-      `<span class="item">${keys.split("+").map((k) => NFC.glyph(k, style)).join("")}<span>${label}</span></span>`).join("");
+    $("glyph-preview").replaceChildren(...items.map(([keys, label]) => {
+      const item = document.createElement("span");
+      item.className = "item";
+      for (const k of keys.split("+")) { const g = NFC.glyphNode(k, style); if (g) item.appendChild(g); }
+      const text = document.createElement("span");
+      text.textContent = label;
+      item.appendChild(text);
+      return item;
+    }));
   }
   glyphSelect.addEventListener("change", () => { settings.glyphs = glyphSelect.value; renderGlyphPreview(); persist(); });
   renderGlyphPreview();
@@ -86,9 +93,10 @@
         const on = (bindings[a.id] || []).some((b) => NFC.bindingActive(pad, b));
         chips[a.id].classList.toggle("on", on);
       }
-      $("raw").innerHTML =
-        pad.buttons.map((b, i) => `<span class="${b.pressed ? "on" : ""}">B${i}</span>`).join("") +
-        pad.axes.map((v, i) => `<span class="${Math.abs(v) > 0.5 ? "on" : ""}">A${i} ${v.toFixed(2)}</span>`).join("");
+      const chip = (text, on) => { const s = document.createElement("span"); s.className = on ? "on" : ""; s.textContent = text; return s; };
+      $("raw").replaceChildren(
+        ...pad.buttons.map((b, i) => chip(`B${i}`, b.pressed)),
+        ...pad.axes.map((v, i) => chip(`A${i} ${v.toFixed(2)}`, Math.abs(v) > 0.5)));
       if (wizard) wizardFrame(pad);
     } else if (currentPadId !== null) {
       currentPadId = null;

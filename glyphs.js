@@ -173,6 +173,17 @@
     }
   }
 
+  // Same as glyph(), but as a DOM node (parsed as SVG, never via innerHTML).
+  function glyphNode(btn, style = "xbox") {
+    const svg = glyph(btn, style);
+    if (!svg) return null;
+    // The markup carries no xmlns (it was written for innerHTML); the XML
+    // parser needs one or the result is a plain, non-rendering element.
+    const xml = svg.replace(/^<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    const doc = new DOMParser().parseFromString(xml, "image/svg+xml");
+    return document.importNode(doc.documentElement, true);
+  }
+
   // Guess the glyph family from the Gamepad API id string.
   function detectGlyphStyle(pad) {
     if (!pad) return "xbox";
@@ -183,5 +194,5 @@
     return "xbox";
   }
 
-  global.NFC = Object.assign(global.NFC || {}, { glyph, detectGlyphStyle });
+  global.NFC = Object.assign(global.NFC || {}, { glyph, glyphNode, detectGlyphStyle });
 })(typeof window !== "undefined" ? window : this);

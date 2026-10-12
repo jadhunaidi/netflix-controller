@@ -22,34 +22,40 @@
 
   // ---------------------------------------------------------------- UI ----
 
-  const ui = document.createElement("div");
-  ui.id = "nfc-root";
-  ui.innerHTML = `
-    <div class="nfc-info" hidden>
-      <div class="nfc-info-row"></div>
-      <div class="nfc-info-title"></div>
-      <div class="nfc-info-meta"></div>
-      <div class="nfc-info-desc"></div>
-    </div>
-    <div class="nfc-lift" hidden><img alt=""></div>
-    <div class="nfc-ring" hidden></div>
-    <div class="nfc-toast" hidden></div>
-    <div class="nfc-bar" hidden></div>
-    <div class="nfc-help" hidden>
-      <div class="nfc-help-card">
-        <h2>Controller controls</h2>
-        <div class="nfc-help-cols">
-          <section><h3>Menus</h3><dl data-help="menus"></dl></section>
-          <section><h3>Watching</h3><dl data-help="watching"></dl></section>
-        </div>
-        <p class="nfc-help-foot"></p>
-      </div>
-    </div>
-    <div class="nfc-osk" hidden>
-      <div class="nfc-osk-field"><span class="nfc-osk-text"></span><span class="nfc-osk-caret"></span></div>
-      <div class="nfc-osk-keys"></div>
-      <div class="nfc-osk-legend">A type · B / Y delete · X space · Start done</div>
-    </div>`;
+  // Tiny DOM builder: el("div", { class: "x", hidden: true }, child, "text", ...).
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === false || v == null) continue;
+      if (k === "hidden") node.hidden = true;
+      else node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of children) {
+      if (c == null) continue;
+      node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    }
+    return node;
+  }
+
+  const ui = el("div", { id: "nfc-root" },
+    el("div", { class: "nfc-info", hidden: true },
+      el("div", { class: "nfc-info-row" }), el("div", { class: "nfc-info-title" }),
+      el("div", { class: "nfc-info-meta" }), el("div", { class: "nfc-info-desc" })),
+    el("div", { class: "nfc-lift", hidden: true }, el("img", { alt: "" })),
+    el("div", { class: "nfc-ring", hidden: true }),
+    el("div", { class: "nfc-toast", hidden: true }),
+    el("div", { class: "nfc-bar", hidden: true }),
+    el("div", { class: "nfc-help", hidden: true },
+      el("div", { class: "nfc-help-card" },
+        el("h2", null, "Controller controls"),
+        el("div", { class: "nfc-help-cols" },
+          el("section", null, el("h3", null, "Menus"), el("dl", { "data-help": "menus" })),
+          el("section", null, el("h3", null, "Watching"), el("dl", { "data-help": "watching" }))),
+        el("p", { class: "nfc-help-foot" }))),
+    el("div", { class: "nfc-osk", hidden: true },
+      el("div", { class: "nfc-osk-field" }, el("span", { class: "nfc-osk-text" }), el("span", { class: "nfc-osk-caret" })),
+      el("div", { class: "nfc-osk-keys" }),
+      el("div", { class: "nfc-osk-legend" }, "A type · B / Y delete · X space · Start done")));
   document.documentElement.appendChild(ui);
 
   const $ = (sel) => ui.querySelector(sel);
@@ -79,13 +85,9 @@
     return NFC.detectGlyphStyle(pad);
   }
 
-  const escapeHtml = (t) => String(t).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-  // "lb+rb" -> two glyphs side by side.
+  // "lb+rb" -> two glyph nodes side by side.
   function glyphGroup(keys, style) {
-    return keys.split("+").map((k) =>
-      `<span class="nfc-glyph-wrap" data-btn="${k}">${NFC.glyph(k, style)}</span>`).join("");
+    return keys.split("+").map((k) => el("span", { class: "nfc-glyph-wrap", "data-btn": k }, NFC.glyphNode(k, style)));
   }
 
   function confirmLabel(el) {
@@ -153,9 +155,8 @@
     const sig = style + "|" + items.map((i) => i.join(":")).join("|");
     if (sig !== barSig) {
       barSig = sig;
-      barEl.innerHTML = items.map(([keys, label]) =>
-        `<div class="nfc-bar-item">${glyphGroup(keys, style)}<span class="nfc-bar-label">${escapeHtml(label)}</span></div>`
-      ).join("");
+      barEl.replaceChildren(...items.map(([keys, label]) =>
+        el("div", { class: "nfc-bar-item" }, ...glyphGroup(keys, style), el("span", { class: "nfc-bar-label" }, label))));
     }
     barEl.hidden = false;
     const inPlayer = isPlayer();
@@ -1211,11 +1212,10 @@
   const osk = { open: false, input: null, row: 1, col: 0, frac: 0.05, text: "" };
   const oskKeysEl = $(".nfc-osk-keys"), oskTextEl = $(".nfc-osk-text");
 
-  oskKeysEl.innerHTML = OSK_ROWS.map((row, r) =>
-    `<div class="nfc-osk-row">${row.map((k, c) =>
-      `<span class="nfc-osk-key${k.length > 1 ? " nfc-osk-wide" : ""}" data-r="${r}" data-c="${c}">${k === "SPACE" ? "Space" : k === "CLEAR" ? "Clear" : k === "DONE" ? "Done" : k}</span>`
-    ).join("")}</div>`
-  ).join("");
+  const OSK_LABELS = { SPACE: "Space", CLEAR: "Clear", DONE: "Done" };
+  oskKeysEl.replaceChildren(...OSK_ROWS.map((row, r) =>
+    el("div", { class: "nfc-osk-row" }, ...row.map((k, c) =>
+      el("span", { class: "nfc-osk-key" + (k.length > 1 ? " nfc-osk-wide" : ""), "data-r": r, "data-c": c }, OSK_LABELS[k] || k)))));
 
   function renderOsk() {
     oskKeysEl.querySelectorAll(".nfc-osk-key").forEach((k) => {
@@ -1314,10 +1314,10 @@
       ],
     };
     for (const [key, rows] of Object.entries(HELP)) {
-      helpEl.querySelector(`[data-help="${key}"]`).innerHTML = rows.map(([keys, label]) =>
-        `<dt>${glyphGroup(keys, style)}</dt><dd>${escapeHtml(label)}</dd>`).join("");
+      helpEl.querySelector(`[data-help="${key}"]`).replaceChildren(...rows.flatMap(([keys, label]) =>
+        [el("dt", null, ...glyphGroup(keys, style)), el("dd", null, label)]));
     }
-    helpEl.querySelector(".nfc-help-foot").innerHTML = `${glyphGroup("back", style)}<span>Close</span>`;
+    helpEl.querySelector(".nfc-help-foot").replaceChildren(...glyphGroup("back", style), el("span", null, "Close"));
   }
 
   function onAction(action, meta = {}) {

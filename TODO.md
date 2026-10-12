@@ -91,7 +91,7 @@
 
 ### Quality
 - [ ] Turn the mock-page test into a repeatable automated test
-- [ ] Replace `innerHTML` with DOM building to clear the three lint warnings
+- [x] Replace `innerHTML` with DOM building to clear the lint warnings (AMO validator flagged them)
 - [ ] Add a README with install, controls and troubleshooting
 - [ ] Put the project under git
 
