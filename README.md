@@ -18,17 +18,15 @@ A Firefox extension for browsing Netflix and controlling playback with a gamepad
 2. Click **Load Temporary Add-on...** and pick `manifest.json`.
 3. Open Netflix and press any button on the controller.
 
-A temporary add-on is removed when Firefox closes. For a permanent install, sign it with Mozilla (see below).
+A temporary add-on is removed when Firefox closes. For a permanent install, use the signed version from addons.mozilla.org.
 
-## Signing
+## Building a package
 
-`sign.ps1` uploads the add-on to Mozilla's unlisted channel and downloads the signed `.xpi`. It needs API credentials from https://addons.mozilla.org/developers/addon/api/key/ and prompts for them with hidden input.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File sign.ps1
+```bash
+npx web-ext build --source-dir . --artifacts-dir dist --overwrite-dest --ignore-files "dist/**" "*.md" ".git/**"
 ```
 
-Bump `"version"` in `manifest.json` before signing a new build; Mozilla won't sign the same version twice.
+The output is a zip you can rename to `.xpi`. Submit it on https://addons.mozilla.org/developers/ to have it signed; bump `"version"` in `manifest.json` first, since Mozilla won't accept the same version twice.
 
 ## Controls
 
@@ -54,7 +52,6 @@ Bump `"version"` in `manifest.json` before signing a new build; Mozilla won't si
 - `content.js` / `content.css` - navigation, TV mode, player control, controls bar, on-screen keyboard
 - `options.html` / `options.js` / `options.css` - settings page, controller tester, remap wizard
 - `background.js` - toolbar button opens the settings page
-- `sign.ps1` - Mozilla signing helper
 - `TODO.md` - roadmap and test checklists
 
 ## Status

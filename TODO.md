@@ -2,7 +2,7 @@
 
 ## Status
 
-- **Version:** 1.2.0 (adds controls bar with button icons). 1.1.0 (TV mode) is waiting for Mozilla approval
+- **Version:** 1.2.3 (bug fixes from live testing, no innerHTML), submitted to the listed channel on addons.mozilla.org
 - **Tested on:** a mock Netflix page with a simulated controller (menus, row paging, details, My List, search keyboard, player controls, TV mode, controls bar, help screen icons)
 - **Tested on real netflix.com (2026-10-12, new "Hawkins" UI):** home rows, row paging, title details open/close, search keyboard, focus memory, back navigation. Player **not** testable in the test browser (DRM error M7701-1003) - needs checking in Firefox
 
@@ -11,10 +11,9 @@
 ## Short term
 
 ### Release
-- [ ] Wait for Mozilla to approve v1.1.0, then download the signed `.xpi` from the developer hub
-- [ ] Sign v1.2.0 (`sign.ps1`, run from any folder) once 1.1.0 is through
+- [ ] Wait for Mozilla to approve the listed 1.2.3 submission
 - [ ] Choose the final name (suggested: **Controller for Netflix**), update `"name"` in `manifest.json` and bump the version
-- [ ] Remove the temporary copy from `about:debugging` once the signed version is installed
+- [ ] Remove the temporary copy from `about:debugging` once the store version is installed
 
 ### Real-world testing on netflix.com
 - [ ] Profile picker: highlight lands on a profile and A selects it (not reached in testing - session already had a profile)
@@ -114,5 +113,4 @@
 - [x] Back navigation rework: waits for the modal/page to actually change instead of fixed delays, per-page focus memory (kept across reloads) so B returns to the exact card, double-press guard, row paging waits for the slide to settle
 - [x] Controls bar: console-style button prompts that follow context, auto-detected Xbox / PlayStation / Nintendo / generic icons, press animation, auto-hide in player
 - [x] Hand-drawn SVG button icon set (`glyphs.js`), also used on the help screen and settings preview
-- [x] Signing script (`sign.ps1`)
 - [x] Lint: 0 errors
