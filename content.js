@@ -92,7 +92,9 @@
     if (!el || !el.isConnected) return "Select";
     if (el.matches("input, textarea")) return "Type";
     if (isHandle(el)) return "More";
-    if (el.closest('.profile-link, [data-uia="profile-link"]')) return "Choose";
+    if (el.closest(PROFILE_SEL)) return "Choose";
+    // Episode and "More like this" tiles start playback straight away.
+    if (el.matches('[data-uia="titleCard--container"]')) return "Play";
     if (/play/i.test(el.getAttribute("data-uia") || "") || /^play$/i.test(el.textContent.trim())) return "Play";
     if (el.closest(CARD_SEL) || cardImage(el)) return "Open";
     return "Select";
@@ -179,16 +181,26 @@
   }
 
   // Hide the mouse cursor while the controller is in use; any real mouse
-  // movement brings it back.
-  let controllerActive = false;
+  // movement, or a while without input, brings it back and hides the
+  // ring and bar. The focused element is kept, so the next press carries on
+  // from the same place.
+  const IDLE_MS = 20000;
+  let controllerActive = false, idleTimer = 0;
+  function sleepController() {
+    clearTimeout(idleTimer);
+    if (!controllerActive) return;
+    controllerActive = false;
+    document.documentElement.classList.remove("nfc-active");
+    refreshBar(false);
+  }
   function markControllerActive() {
     controllerActive = true;
     document.documentElement.classList.add("nfc-active");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(sleepController, IDLE_MS);
   }
   window.addEventListener("mousemove", (e) => {
-    if (e.isTrusted && e.movementX + e.movementY !== 0) {
-      document.documentElement.classList.remove("nfc-active");
-    }
+    if (e.isTrusted && e.movementX + e.movementY !== 0) sleepController();
   }, { passive: true });
 
   window.addEventListener("gamepadconnected", (e) => {
@@ -216,6 +228,10 @@
     let best = null;
     for (const d of list) {
       if (d.closest("#nfc-root") || d === closingModal) continue;
+      // The hover preview that pops up over a card is not a dialog for us: it
+      // is hidden in TV mode and must never swallow a B press.
+      if (/MINI_MODAL/.test(d.getAttribute("data-uia") || "") || d.matches(".mini-modal, .previewModal--wrapper.mini-modal")) continue;
+      if (getComputedStyle(d).display === "none") continue;
       // While the title dialog animates in it is still small; trust its
       // container whenever the URL says a title is open.
       const ok = bigEnough(d) || (inDetails && /^modal-motion-container/.test(d.getAttribute("data-uia") || ""));
@@ -273,6 +289,11 @@
   };
   const isHandle = (el) => /\bhandle(Next|Prev)\b/.test(el.className || "") ||
     /^carousel-hawkins-(left|right)-button$/.test(el.getAttribute("data-uia") || "");
+  // Profile picker tiles (old and new "Who's watching?" markup).
+  const PROFILE_SEL = '.profile-link, [data-uia="profile-link"], [data-uia^="profile-selector+tile"]';
+  // Tiles that are one control even though they contain smaller buttons
+  // (an episode or "More like this" card has a My List button inside it).
+  const TILE_SEL = CARD_SEL + ', [data-uia="titleCard--container"]';
 
   // Inline text links in title details (cast, genres, "more", the rating)
   // are clutter for a D-pad; skip them so Down goes to the episodes.
@@ -304,8 +325,10 @@
   }
 
   // Nested focusables are one control. Keep the outer one when the inner
-  // fills it (Netflix puts a plain <button> inside its play-button link);
-  // otherwise keep the inner (a tabindex wrapper around a small link).
+  // fills it (Netflix puts a plain <button> inside its play-button link) or
+  // when the outer is a card/tile (its inner My List button is reached with
+  // Y, not the D-pad); otherwise keep the inner (a tabindex wrapper around a
+  // small link).
   function dedupeNested(all) {
     const set = new Set(all);
     const drop = new Set();
@@ -314,7 +337,7 @@
       let p = el.parentElement;
       for (let d = 0; p && d < 25; d++, p = p.parentElement) {
         if (!set.has(p)) continue;
-        if (area(el) >= area(p) * 0.8) drop.add(el);
+        if (area(el) >= area(p) * 0.8 || p.matches(TILE_SEL)) drop.add(el);
         else drop.add(p);
         break;
       }
@@ -398,19 +421,25 @@
     const key = focusMemory[pageKey()];
     const el = key && (await waitFor(() => findByKey(key), { timeout: 1500 }));
     if (el) { setFocus(el); return true; }
-    const cands = await waitFor(() => { const c = getCandidates(); return c.length ? c : null; }, { timeout: 1500 });
+    // A page that is still rendering offers only its nav links at first;
+    // give the content (cards, Play, profiles) a moment before settling for those.
+    const isContent = (c) => INITIAL_SEL.some((sel) => c.matches(sel));
+    let cands = await waitFor(() => { const c = getCandidates(); return c.some(isContent) ? c : null; }, { timeout: 1500 });
+    if (!cands) cands = await waitFor(() => { const c = getCandidates(); return c.length ? c : null; }, { timeout: 500 });
     if (cands) setFocus(pickInitial(cands));
     return false;
   }
 
+  const INITIAL_SEL = [
+    '[data-uia^="control-play-pause"]', '[data-uia="player-play-pause"]',
+    '[data-uia^="profile-selector+tile"]', '[data-uia="profile-link"]', ".profile-link",
+    '[data-uia="play-button"]', '[data-uia="billboard-play"]', '[data-uia="play-video-button"]',
+    '[data-uia="standard-card"]', '[data-uia="progress-card"]',
+    ".title-card a", ".title-card-container a", ".slider-item a",
+  ];
+
   function pickInitial(cands) {
-    const preferred = [
-      '[data-uia^="control-play-pause"]', '[data-uia="player-play-pause"]',
-      '[data-uia="profile-link"]', ".profile-link",
-      '[data-uia="play-button"]', '[data-uia="billboard-play"]', '[data-uia="play-video-button"]',
-      '[data-uia="standard-card"]', '[data-uia="progress-card"]',
-      ".title-card a", ".title-card-container a", ".slider-item a",
-    ];
+    const preferred = INITIAL_SEL;
     for (const sel of preferred) {
       const hit = cands.find((c) => c.matches(sel) && inViewport(c.getBoundingClientRect()));
       if (hit) return hit;
@@ -492,7 +521,10 @@
 
   function applyTvMode() {
     document.documentElement.classList.toggle("nfc-tv", !!settings.tvMode);
-    if (!settings.tvMode) clearTvFocus();
+    // Turning it on shows the lift and info panel for the current card straight
+    // away; turning it off clears them.
+    if (settings.tvMode && focused && focused.isConnected) updateTvFocus(focused);
+    else clearTvFocus();
   }
 
   function clearTvFocus() {
@@ -652,7 +684,8 @@
 
   // Ring follows the focused element every frame (cards animate/resize).
   function updateRing() {
-    const r = (!isPlayer() || playerPopup()) && controllerActive && focused && focused.isConnected
+    // No ring while the on-screen keyboard or help screen covers the page.
+    const r = (!isPlayer() || playerPopup()) && controllerActive && !osk.open && helpEl.hidden && focused && focused.isConnected
       ? focused.getBoundingClientRect() : null;
     if (r && r.width > 0) {
       let box = r;
@@ -747,6 +780,16 @@
     transitioning = true;
     try {
       if (await closeModal()) return;
+      // An open drop-down outside a dialog (the Genres menu on Shows/Movies)
+      // closes first, without leaving the page.
+      const menu = document.querySelector('[aria-haspopup="true"][aria-expanded="true"], [data-uia="dropdown-toggle"][aria-expanded="true"]');
+      if (menu && !menu.closest("#nfc-root") && isUsable(menu)) {
+        menu.click();
+        await sleep(200);
+        if (menu.getAttribute("aria-expanded") === "true") pressKey("Escape", "Escape", 27, menu);
+        if (menu.isConnected && isUsable(menu)) setFocus(menu, { scroll: false });
+        return;
+      }
       const path = location.pathname.replace(/\/$/, "");
       if (path === "/browse" || path === "") {
         toast("Already on Home");
@@ -1163,7 +1206,9 @@
     "zxcvbnm-.⌫".split(""),
     ["SPACE", "CLEAR", "DONE"],
   ];
-  const osk = { open: false, input: null, row: 1, col: 0, text: "" };
+  // `frac` is the column as a fraction of the row, set only by sideways moves,
+  // so Up then Down returns to the key you started on.
+  const osk = { open: false, input: null, row: 1, col: 0, frac: 0.05, text: "" };
   const oskKeysEl = $(".nfc-osk-keys"), oskTextEl = $(".nfc-osk-text");
 
   oskKeysEl.innerHTML = OSK_ROWS.map((row, r) =>
@@ -1193,16 +1238,24 @@
     osk.open = true;
     osk.input = input;
     osk.text = input.value || "";
-    osk.row = 1; osk.col = 0;
+    osk.row = 1; osk.col = 0; osk.frac = 0.5 / OSK_ROWS[1].length;
     input.focus({ preventScroll: true });
     oskEl.hidden = false;
     renderOsk();
   }
 
-  function closeOsk() {
+  async function closeOsk() {
     osk.open = false;
     oskEl.hidden = true;
-    if (osk.input) setFocus(osk.input, { scroll: false });
+    const input = osk.input;
+    // After a search, land on the first result rather than back in the box.
+    if (osk.text.trim()) {
+      const firstCard = () => getCandidates().find((c) => c.matches(CARD_SEL) && inViewport(c.getBoundingClientRect())) || null;
+      const card = await waitFor(firstCard, { timeout: 900 });
+      if (osk.open) return;
+      if (card) { setFocus(card, { scroll: false }); return; }
+    }
+    if (input && input.isConnected) setFocus(input, { scroll: false });
   }
 
   function oskType(ch) {
@@ -1218,13 +1271,17 @@
   function oskAction(action) {
     const rows = OSK_ROWS;
     switch (action) {
-      case "left": osk.col = (osk.col - 1 + rows[osk.row].length) % rows[osk.row].length; break;
-      case "right": osk.col = (osk.col + 1) % rows[osk.row].length; break;
+      case "left":
+      case "right": {
+        const n = rows[osk.row].length;
+        osk.col = (osk.col + (action === "right" ? 1 : -1) + n) % n;
+        osk.frac = (osk.col + 0.5) / n;
+        break;
+      }
       case "up":
       case "down": {
-        const frac = (osk.col + 0.5) / rows[osk.row].length;
         osk.row = (osk.row + (action === "down" ? 1 : -1) + rows.length) % rows.length;
-        osk.col = Math.min(rows[osk.row].length - 1, Math.floor(frac * rows[osk.row].length));
+        osk.col = Math.min(rows[osk.row].length - 1, Math.floor(osk.frac * rows[osk.row].length));
         break;
       }
       case "confirm": oskType(rows[osk.row][osk.col]); return;
@@ -1385,7 +1442,9 @@
       if (ctx !== "player") { clearInterval(menuKeepAlive); menuMode = null; }
       if (controllerActive) {
         refreshBar(true);
-        if (transitioning || isPlayer()) return;
+        // While typing on the keyboard every keystroke changes the URL; leave
+        // the highlight alone until the keyboard closes.
+        if (transitioning || isPlayer() || osk.open) return;
         if (ctx === "modal") {
           // Title details: wait for its Play button rather than landing on the close X.
           const modal = getModal();

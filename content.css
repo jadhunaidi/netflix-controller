@@ -144,7 +144,8 @@ html.nfc-tv.nfc-active .nfc-tv-dim [data-uia="progress-card"]:not(.nfc-tv-cur) {
 
 /* No hover pop-ups: the page ignores the (hidden) mouse until it moves again. */
 html.nfc-tv.nfc-active body { pointer-events: none !important; }
-html.nfc-tv.nfc-active .previewModal--wrapper.mini-modal { display: none !important; }
+html.nfc-tv.nfc-active .previewModal--wrapper.mini-modal,
+html.nfc-tv.nfc-active [data-uia="modal-motion-container-MINI_MODAL"] { display: none !important; }
 
 /* Title info panel. */
 .nfc-info {
